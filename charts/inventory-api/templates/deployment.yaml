@@ -5,7 +5,10 @@ metadata:
   labels:
     {{- include "inventory-api.labels" . | nindent 4 }}
 spec:
+  {{- /* With the HPA on, it owns the replica count; setting it here would reset scaling on every upgrade. */}}
+  {{- if not .Values.autoscaling.enabled }}
   replicas: {{ .Values.replicaCount }}
+  {{- end }}
   revisionHistoryLimit: 5
   selector:
     matchLabels:

@@ -1,6 +1,6 @@
 apiVersion: v2
 name: inventory-api
-description: Node.js inventory API on EKS - secure-by-default Deployment, Service and IRSA ServiceAccount
+description: Node.js inventory API on EKS - hardened Deployment, IRSA, ALB Ingress, HPA, PDB and NetworkPolicy
 type: application
 # Chart version: bump on every chart change (SemVer).
 version: 0.1.0

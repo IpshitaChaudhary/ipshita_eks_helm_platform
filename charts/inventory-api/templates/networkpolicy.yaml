@@ -1,0 +1,33 @@
+{{- if .Values.networkPolicy.enabled }}
+# Default-deny ingress for the app pods; only the listed sources may reach the HTTP port.
+# Enforced by the VPC CNI network policy agent (enableNetworkPolicy=true on the add-on).
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: {{ include "inventory-api.fullname" . }}
+  labels:
+    {{- include "inventory-api.labels" . | nindent 4 }}
+spec:
+  podSelector:
+    matchLabels:
+      {{- include "inventory-api.selectorLabels" . | nindent 6 }}
+  policyTypes: [Ingress]
+  {{- if or .Values.networkPolicy.allowFromNamespaces .Values.networkPolicy.allowFromCIDRs }}
+  ingress:
+    - from:
+        {{- range .Values.networkPolicy.allowFromNamespaces }}
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: {{ . | quote }}
+        {{- end }}
+        {{- range .Values.networkPolicy.allowFromCIDRs }}
+        - ipBlock:
+            cidr: {{ . | quote }}
+        {{- end }}
+      ports:
+        - port: http
+          protocol: TCP
+  {{- else }}
+  ingress: []
+  {{- end }}
+{{- end }}

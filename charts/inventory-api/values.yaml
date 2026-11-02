@@ -1,6 +1,7 @@
 # Default values for inventory-api.
 # Defaults are production-safe; environments override only what differs (image tag, replicas, hostnames).
 
+# Used only when autoscaling.enabled=false.
 replicaCount: 2
 
 image:
@@ -89,3 +90,35 @@ podLabels: {}
 nodeSelector: {}
 tolerations: []
 affinity: {}
+
+autoscaling:
+  enabled: true
+  minReplicas: 2
+  maxReplicas: 6
+  targetCPUUtilizationPercentage: 70
+  # Scale down slowly so a brief dip doesn't remove capacity right before the next spike.
+  scaleDownStabilizationSeconds: 300
+
+podDisruptionBudget:
+  enabled: true
+  # Node drains and cluster upgrades may evict at most one replica at a time.
+  maxUnavailable: 1
+
+ingress:
+  enabled: false
+  # Requires the AWS Load Balancer Controller (see platform/).
+  className: alb
+  host: ""
+  # ACM certificate ARN for HTTPS on the ALB.
+  certificateArn: ""
+  # Reuse one ALB across apps by giving them the same group name.
+  groupName: ""
+  scheme: internet-facing
+  annotations: {}
+
+networkPolicy:
+  enabled: true
+  # Namespaces allowed to reach the app (matched on kubernetes.io/metadata.name).
+  # With ALB "ip" targets, traffic arrives from the VPC, so also list the VPC CIDRs.
+  allowFromNamespaces: []
+  allowFromCIDRs: []
