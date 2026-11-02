@@ -1,0 +1,91 @@
+# Default values for inventory-api.
+# Defaults are production-safe; environments override only what differs (image tag, replicas, hostnames).
+
+replicaCount: 2
+
+image:
+  # e.g. <account>.dkr.ecr.<region>.amazonaws.com/inventory-api
+  repository: inventory-api
+  # Defaults to .Chart.AppVersion. Pin to an immutable tag (commit SHA) in real deploys, never "latest".
+  tag: ""
+  pullPolicy: IfNotPresent
+
+imagePullSecrets: []
+nameOverride: ""
+fullnameOverride: ""
+
+serviceAccount:
+  # A dedicated ServiceAccount per app, so IRSA permissions are scoped to this workload only.
+  create: true
+  name: ""
+  # IRSA: set to the IAM role ARN this app may assume. Empty = no AWS access.
+  roleArn: ""
+  annotations: {}
+
+# Port the container listens on (the app reads PORT).
+containerPort: 3000
+
+env: []
+#  - name: LOG_LEVEL
+#    value: info
+
+# Pull all keys of existing Secrets/ConfigMaps in as env vars. The chart never creates Secrets:
+# create them out of band (External Secrets / Secrets Manager), so no credential lives in Git.
+envFrom: []
+#  - secretRef:
+#      name: inventory-api-secrets
+
+service:
+  type: ClusterIP
+  port: 80
+
+probes:
+  path: /health
+  readiness:
+    periodSeconds: 5
+    failureThreshold: 3
+  liveness:
+    initialDelaySeconds: 10
+    periodSeconds: 10
+    failureThreshold: 3
+
+resources:
+  requests:
+    cpu: 50m
+    memory: 64Mi
+  limits:
+    # No CPU limit on purpose: avoids CFS throttling; the request still reserves capacity.
+    memory: 128Mi
+
+rollingUpdate:
+  maxUnavailable: 0
+  maxSurge: 1
+
+# The app closes its listener on SIGTERM; keep this above the ALB deregistration delay.
+terminationGracePeriodSeconds: 30
+# Sleep before SIGTERM so the load balancer stops sending traffic first (avoids 502s on rollout).
+preStopSleepSeconds: 10
+
+podSecurityContext:
+  runAsNonRoot: true
+  runAsUser: 1000
+  runAsGroup: 1000
+  fsGroup: 1000
+  seccompProfile:
+    type: RuntimeDefault
+
+securityContext:
+  allowPrivilegeEscalation: false
+  readOnlyRootFilesystem: true
+  capabilities:
+    drop: ["ALL"]
+
+# Spread replicas across nodes and AZs. Set to [] to disable.
+topologySpread:
+  enabled: true
+
+podAnnotations: {}
+podLabels: {}
+nodeSelector: {}
+tolerations: []
+affinity: {}
