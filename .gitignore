@@ -1,0 +1,17 @@
+# Helm
+charts/*/charts/
+charts/*/Chart.lock
+*.tgz
+
+# Rendered output from local testing
+rendered/
+
+# Local overrides that may hold real account IDs or hostnames
+*.local.yaml
+values-*.local.yaml
+
+# Editors / OS
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
