@@ -1,0 +1,10 @@
+# Fixed replica count with HPA/PDB/NetworkPolicy off (e.g. a small dev cluster).
+replicaCount: 1
+autoscaling:
+  enabled: false
+podDisruptionBudget:
+  enabled: false
+networkPolicy:
+  enabled: false
+topologySpread:
+  enabled: false
