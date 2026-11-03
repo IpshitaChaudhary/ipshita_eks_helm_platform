@@ -9,6 +9,7 @@ chart versions, so a cluster can be rebuilt exactly.
 | metrics-server | Feeds CPU/memory to the HorizontalPodAutoscaler | `metrics-server/metrics-server` | 3.12.1 |
 | AWS Load Balancer Controller | Turns `Ingress` (class `alb`) into an ALB with target-type `ip` | `eks/aws-load-balancer-controller` | 1.8.1 |
 | External Secrets | Syncs AWS Secrets Manager into the Secrets apps read with `envFrom` | `external-secrets/external-secrets` | 0.10.7 |
+| Karpenter | Adds right-sized nodes when pods are pending, removes them when idle | `oci://public.ecr.aws/karpenter/karpenter` | 1.1.7 |
 
 ## Prerequisites
 
@@ -27,6 +28,8 @@ export AWS_REGION=us-east-1
 export VPC_ID=vpc-0123456789abcdef0
 export LBC_ROLE_ARN=arn:aws:iam::111122223333:role/example-cluster-aws-lbc
 export ESO_ROLE_ARN=arn:aws:iam::111122223333:role/example-cluster-external-secrets
+export KARPENTER_ROLE_ARN=arn:aws:iam::111122223333:role/example-cluster-karpenter
+export KARPENTER_QUEUE=example-cluster-karpenter-interruptions
 
 ./platform/install.sh                 # install or upgrade everything, in order
 ./platform/install.sh --dry-run       # render only, nothing is applied
@@ -43,3 +46,7 @@ export ESO_ROLE_ARN=arn:aws:iam::111122223333:role/example-cluster-external-secr
   Manager at runtime; the IAM role should allow `secretsmanager:GetSecretValue` only on `app/*`.
   The synced Secret is kept (`deletionPolicy: Retain`) if the ExternalSecret is removed, so a bad
   rollout of the operator can't delete a running app's credentials.
+- **Karpenter nodes are locked down the same way as the managed nodes:** IMDSv2 only with hop
+  limit 1, encrypted gp3 root disk, and subnets/security groups found by tag instead of hard-coded
+  IDs. The NodePool caps total CPU and memory, replaces nodes every 30 days so AMI patches roll
+  out, and never disrupts more than 10% of nodes at once.

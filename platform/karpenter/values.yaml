@@ -1,0 +1,26 @@
+# Values for oci://public.ecr.aws/karpenter/karpenter. Cluster name, interruption queue and the
+# IRSA role are passed by install.sh. Karpenter itself must run on the managed node group (the
+# chart's default affinity keeps it off nodes it launched), otherwise it could remove its own node.
+replicas: 2
+
+settings:
+  clusterName: ""
+  # SQS queue fed by EventBridge with Spot interruption, rebalance and health events, so nodes are
+  # drained before AWS reclaims them instead of disappearing mid-request.
+  interruptionQueue: ""
+
+serviceAccount:
+  annotations: {}
+  #  eks.amazonaws.com/role-arn: set by install.sh
+
+controller:
+  resources:
+    requests:
+      cpu: 250m
+      memory: 512Mi
+    limits:
+      memory: 1Gi
+
+podDisruptionBudget:
+  name: karpenter
+  maxUnavailable: 1

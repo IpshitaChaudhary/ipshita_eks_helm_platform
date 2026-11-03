@@ -13,10 +13,13 @@ DRY_RUN=false
 : "${VPC_ID:?set VPC_ID}"
 : "${LBC_ROLE_ARN:?set LBC_ROLE_ARN (IRSA role for the load balancer controller)}"
 : "${ESO_ROLE_ARN:?set ESO_ROLE_ARN (IRSA role for external-secrets)}"
+: "${KARPENTER_ROLE_ARN:?set KARPENTER_ROLE_ARN (IRSA role for the Karpenter controller)}"
+: "${KARPENTER_QUEUE:?set KARPENTER_QUEUE (SQS interruption queue name)}"
 
 LBC_CHART_VERSION=1.8.1
 METRICS_SERVER_CHART_VERSION=3.12.1
 ESO_CHART_VERSION=0.10.7
+KARPENTER_CHART_VERSION=1.1.7
 
 # install <release> <namespace> <chart> <version> <values-file> [extra helm args...]
 install() {
@@ -31,12 +34,16 @@ install() {
   fi
 }
 
-# apply_manifest <file>: the store's region comes from AWS_REGION, not from the file.
+# apply_manifest <file>: manifests are written for example-cluster in us-east-1; the real
+# cluster name and region come from the environment, so no file needs editing per cluster.
 apply_manifest() {
+  local rendered
+  rendered=$(sed -e "s/region: us-east-1/region: ${AWS_REGION}/" \
+                 -e "s/example-cluster/${CLUSTER_NAME}/g" "$1")
   if $DRY_RUN; then
-    sed "s/region: us-east-1/region: ${AWS_REGION}/" "$1"
+    printf '%s\n' "$rendered"
   else
-    sed "s/region: us-east-1/region: ${AWS_REGION}/" "$1" | kubectl apply -f -
+    printf '%s\n' "$rendered" | kubectl apply -f -
   fi
 }
 
@@ -63,3 +70,14 @@ install external-secrets external-secrets external-secrets/external-secrets \
 # ExternalSecrets (e.g. external-secrets/manifests/inventory-api-external-secret.yaml) ship with
 # each app, because their namespace belongs to the app.
 apply_manifest external-secrets/manifests/cluster-secret-store.yaml
+
+# Karpenter last: everything above runs on the managed node group, and nodes Karpenter adds are
+# only useful once the controllers that serve their pods exist.
+install karpenter kube-system oci://public.ecr.aws/karpenter/karpenter \
+  "$KARPENTER_CHART_VERSION" karpenter/values.yaml \
+  --set settings.clusterName="$CLUSTER_NAME" \
+  --set settings.interruptionQueue="$KARPENTER_QUEUE" \
+  --set serviceAccount.annotations."eks\.amazonaws\.com/role-arn"="$KARPENTER_ROLE_ARN"
+
+apply_manifest karpenter/manifests/ec2nodeclass.yaml
+apply_manifest karpenter/manifests/nodepool.yaml
