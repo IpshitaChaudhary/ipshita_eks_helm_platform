@@ -71,15 +71,54 @@ jobs:
           expect_fail --set serviceAccount.roleArn=not-an-arn
           expect_fail --set autoscaling.minReplicas=5 --set autoscaling.maxReplicas=3
 
+  # Platform add-ons: the install script, every pinned chart rendered with our values, and our own
+  # manifests validated against the Karpenter / External Secrets CRD schemas.
+  platform:
+    name: Platform add-ons
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: azure/setup-helm@v4
+        with:
+          version: ${{ env.HELM_VERSION }}
+
+      - name: Install kubeconform
+        run: |
+          curl -sSL "https://github.com/yannh/kubeconform/releases/download/${KUBECONFORM_VERSION}/kubeconform-linux-amd64.tar.gz" \
+            | tar -xz -C /usr/local/bin kubeconform
+
+      - name: shellcheck install.sh
+        run: shellcheck platform/install.sh
+
+      # Fails if a pinned chart version does not exist or a values key breaks a chart template.
+      - name: Render every add-on (install.sh --dry-run)
+        env:
+          CLUSTER_NAME: ci-cluster
+          AWS_REGION: us-east-1
+          VPC_ID: vpc-0123456789abcdef0
+          LBC_ROLE_ARN: arn:aws:iam::111122223333:role/ci-aws-lbc
+          ESO_ROLE_ARN: arn:aws:iam::111122223333:role/ci-external-secrets
+          KARPENTER_ROLE_ARN: arn:aws:iam::111122223333:role/ci-karpenter
+          KARPENTER_QUEUE: ci-cluster-karpenter
+        run: ./platform/install.sh --dry-run > rendered.yaml && grep -c '^kind:' rendered.yaml
+
+      - name: Validate platform manifests (CRD schemas)
+        run: |
+          kubeconform -strict -summary -kubernetes-version 1.31.0 \
+            -schema-location default \
+            -schema-location 'https://raw.githubusercontent.com/datreeio/CRDs-catalog/main/{{.Group}}/{{.ResourceKind}}_{{.ResourceAPIVersion}}.json' \
+            platform/*/manifests/
+
   # Single required status check for branch protection.
   ci-passed:
     name: ci-passed
     if: always()
-    needs: [charts]
+    needs: [charts, platform]
     runs-on: ubuntu-latest
     steps:
       - name: All checks green
         run: |
-          if [ "${{ needs.charts.result }}" != "success" ]; then
-            echo "charts job: ${{ needs.charts.result }}"; exit 1
+          if [ "${{ needs.charts.result }}" != "success" ] || [ "${{ needs.platform.result }}" != "success" ]; then
+            echo "charts: ${{ needs.charts.result }}, platform: ${{ needs.platform.result }}"; exit 1
           fi
