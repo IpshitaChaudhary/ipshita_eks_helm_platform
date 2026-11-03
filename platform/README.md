@@ -1,0 +1,38 @@
+# Platform add-ons
+
+Cluster-level components that application charts in `charts/` depend on. Each add-on has its own
+folder with a pinned values file, and `install.sh` installs them in dependency order with pinned
+chart versions, so a cluster can be rebuilt exactly.
+
+| Add-on | Why the apps need it | Chart | Version |
+|---|---|---|---|
+| AWS Load Balancer Controller | Turns `Ingress` (class `alb`) into an ALB with target-type `ip` | `eks/aws-load-balancer-controller` | 1.8.1 |
+
+## Prerequisites
+
+- An EKS cluster with an IAM OIDC provider (the `eks` module in
+  [ipshita_terraform_infrastructure_module](https://github.com/IpshitaChaudhary/ipshita_terraform_infrastructure_module)
+  creates both).
+- One IRSA role per add-on, trusted only by that add-on's ServiceAccount. Add-ons never use the
+  node role: a compromised pod on the node must not inherit load-balancer or secret permissions.
+- `helm` 3.14+ and `kubectl` pointed at the cluster.
+
+## Install
+
+```bash
+export CLUSTER_NAME=example-cluster
+export AWS_REGION=us-east-1
+export VPC_ID=vpc-0123456789abcdef0
+export LBC_ROLE_ARN=arn:aws:iam::111122223333:role/example-cluster-aws-lbc
+
+./platform/install.sh                 # install or upgrade everything, in order
+./platform/install.sh --dry-run       # render only, nothing is applied
+```
+
+## Design notes
+
+- **Region and VPC are set explicitly** for the load balancer controller. Without them it asks the
+  instance metadata service, which fails when IMDSv2 hop limit is 1 (as it should be on EKS nodes).
+- **The Service mutator webhook is off.** Otherwise the controller takes over every
+  `type: LoadBalancer` Service in the cluster, including ones meant for the legacy cloud provider.
+- **Two replicas and a PDB** for every controller, so a node drain never removes the only copy.

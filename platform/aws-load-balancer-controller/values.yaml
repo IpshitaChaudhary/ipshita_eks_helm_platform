@@ -1,0 +1,29 @@
+# Values for eks/aws-load-balancer-controller. clusterName, region, vpcId and the IRSA role are
+# passed by install.sh from the environment, so this file holds no account-specific data.
+clusterName: ""
+region: ""
+vpcId: ""
+
+serviceAccount:
+  create: true
+  name: aws-load-balancer-controller
+  annotations: {}
+  #  eks.amazonaws.com/role-arn: set by install.sh
+
+replicaCount: 2
+
+podDisruptionBudget:
+  maxUnavailable: 1
+
+resources:
+  requests:
+    cpu: 100m
+    memory: 128Mi
+  limits:
+    memory: 256Mi
+
+# Only reconcile Ingresses and Services that ask for it explicitly.
+enableServiceMutatorWebhook: false
+
+defaultTags:
+  managed-by: aws-load-balancer-controller
