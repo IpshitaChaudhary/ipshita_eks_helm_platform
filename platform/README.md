@@ -6,7 +6,9 @@ chart versions, so a cluster can be rebuilt exactly.
 
 | Add-on | Why the apps need it | Chart | Version |
 |---|---|---|---|
+| metrics-server | Feeds CPU/memory to the HorizontalPodAutoscaler | `metrics-server/metrics-server` | 3.12.1 |
 | AWS Load Balancer Controller | Turns `Ingress` (class `alb`) into an ALB with target-type `ip` | `eks/aws-load-balancer-controller` | 1.8.1 |
+| External Secrets | Syncs AWS Secrets Manager into the Secrets apps read with `envFrom` | `external-secrets/external-secrets` | 0.10.7 |
 
 ## Prerequisites
 
@@ -24,6 +26,7 @@ export CLUSTER_NAME=example-cluster
 export AWS_REGION=us-east-1
 export VPC_ID=vpc-0123456789abcdef0
 export LBC_ROLE_ARN=arn:aws:iam::111122223333:role/example-cluster-aws-lbc
+export ESO_ROLE_ARN=arn:aws:iam::111122223333:role/example-cluster-external-secrets
 
 ./platform/install.sh                 # install or upgrade everything, in order
 ./platform/install.sh --dry-run       # render only, nothing is applied
@@ -36,3 +39,7 @@ export LBC_ROLE_ARN=arn:aws:iam::111122223333:role/example-cluster-aws-lbc
 - **The Service mutator webhook is off.** Otherwise the controller takes over every
   `type: LoadBalancer` Service in the cluster, including ones meant for the legacy cloud provider.
 - **Two replicas and a PDB** for every controller, so a node drain never removes the only copy.
+- **Secrets never pass through Git or Helm values.** External Secrets reads them from Secrets
+  Manager at runtime; the IAM role should allow `secretsmanager:GetSecretValue` only on `app/*`.
+  The synced Secret is kept (`deletionPolicy: Retain`) if the ExternalSecret is removed, so a bad
+  rollout of the operator can't delete a running app's credentials.

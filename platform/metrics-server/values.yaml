@@ -1,0 +1,18 @@
+# Values for metrics-server/metrics-server. The HorizontalPodAutoscaler in charts/inventory-api
+# reads CPU and memory from this API; without it every HPA reports <unknown> and never scales.
+replicas: 2
+
+podDisruptionBudget:
+  enabled: true
+  minAvailable: 1
+
+# EKS nodes register with their private IP; skip hostname lookups that can fail in private subnets.
+args:
+  - --kubelet-preferred-address-types=InternalIP
+
+resources:
+  requests:
+    cpu: 100m
+    memory: 200Mi
+  limits:
+    memory: 400Mi

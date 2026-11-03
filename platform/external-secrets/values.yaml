@@ -1,0 +1,32 @@
+# Values for external-secrets/external-secrets. The operator reads AWS Secrets Manager through its
+# own IRSA role (annotation set by install.sh) and writes plain Kubernetes Secrets that the
+# application charts consume with envFrom.
+installCRDs: true
+
+replicaCount: 2
+
+serviceAccount:
+  create: true
+  name: external-secrets
+  annotations: {}
+  #  eks.amazonaws.com/role-arn: set by install.sh
+
+podDisruptionBudget:
+  enabled: true
+  minAvailable: 1
+
+resources:
+  requests:
+    cpu: 50m
+    memory: 128Mi
+  limits:
+    memory: 256Mi
+
+webhook:
+  replicaCount: 2
+  podDisruptionBudget:
+    enabled: true
+    minAvailable: 1
+
+certController:
+  replicaCount: 1
