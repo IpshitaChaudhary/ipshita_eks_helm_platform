@@ -1,0 +1,23 @@
+{{ include "inventory-api.fullname" . }} is deployed to namespace {{ .Release.Namespace }}.
+
+Image: {{ include "inventory-api.image" . }}
+
+Watch the rollout:
+  kubectl -n {{ .Release.Namespace }} rollout status deploy/{{ include "inventory-api.fullname" . }}
+
+{{- if .Values.ingress.enabled }}
+
+Public URL (once the ALB is provisioned): https://{{ .Values.ingress.host }}
+{{- else }}
+
+Test locally:
+  kubectl -n {{ .Release.Namespace }} port-forward svc/{{ include "inventory-api.fullname" . }} 8080:{{ .Values.service.port }}
+  curl http://localhost:8080{{ .Values.probes.path }}
+{{- end }}
+{{- if and .Values.networkPolicy.enabled (not (or .Values.networkPolicy.allowFromNamespaces .Values.networkPolicy.allowFromCIDRs)) }}
+
+WARNING: networkPolicy is enabled with no allowed sources, so all ingress to the pods is denied
+(port-forward still works). Set networkPolicy.allowFromNamespaces / allowFromCIDRs.
+{{- end }}
+
+Roll back: helm rollback {{ .Release.Name }} -n {{ .Release.Namespace }}

@@ -1,0 +1,85 @@
+# Every chart is linted and rendered with each of its ci/*-values.yaml scenarios, and the
+# rendered manifests are validated against the Kubernetes API schema, so a template typo or an
+# invalid field fails the PR instead of failing `helm upgrade` against a live cluster.
+name: ci
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+env:
+  HELM_VERSION: v3.16.3
+  KUBECONFORM_VERSION: v0.6.7
+
+jobs:
+  charts:
+    name: Lint + render (k8s ${{ matrix.kubernetes }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        # Oldest supported (Chart.yaml kubeVersion) and the version we run.
+        kubernetes: ["1.30.0", "1.31.0"]
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: azure/setup-helm@v4
+        with:
+          version: ${{ env.HELM_VERSION }}
+
+      - name: Install kubeconform
+        run: |
+          curl -sSL "https://github.com/yannh/kubeconform/releases/download/${KUBECONFORM_VERSION}/kubeconform-linux-amd64.tar.gz" \
+            | tar -xz -C /usr/local/bin kubeconform
+
+      - name: Lint, render and validate every chart scenario
+        env:
+          KUBE_VERSION: ${{ matrix.kubernetes }}
+        run: |
+          set -euo pipefail
+          for chart in charts/*/; do
+            echo "::group::helm lint ${chart}"
+            helm lint "$chart" --strict
+            echo "::endgroup::"
+            for values in "$chart"ci/*-values.yaml; do
+              echo "::group::render ${values}"
+              helm lint "$chart" --strict -f "$values"
+              # -strict rejects unknown fields; -summary prints a per-file result.
+              helm template ci "$chart" -f "$values" --kube-version "$KUBE_VERSION" \
+                | kubeconform -strict -summary -kubernetes-version "$KUBE_VERSION"
+              echo "::endgroup::"
+            done
+          done
+
+      # Guard rails must keep failing: these renders are expected to be rejected.
+      - name: Negative tests
+        run: |
+          set -uo pipefail
+          chart=charts/inventory-api
+          expect_fail() {
+            if helm template ci "$chart" "$@" >/dev/null 2>&1; then
+              echo "::error::expected failure but render succeeded: $*"; exit 1
+            fi
+            echo "rejected as expected: $*"
+          }
+          expect_fail --set image.tag=latest
+          expect_fail --set ingress.enabled=true
+          expect_fail --set serviceAccount.roleArn=not-an-arn
+          expect_fail --set autoscaling.minReplicas=5 --set autoscaling.maxReplicas=3
+
+  # Single required status check for branch protection.
+  ci-passed:
+    name: ci-passed
+    if: always()
+    needs: [charts]
+    runs-on: ubuntu-latest
+    steps:
+      - name: All checks green
+        run: |
+          if [ "${{ needs.charts.result }}" != "success" ]; then
+            echo "charts job: ${{ needs.charts.result }}"; exit 1
+          fi

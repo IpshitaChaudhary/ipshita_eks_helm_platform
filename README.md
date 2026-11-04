@@ -13,8 +13,17 @@ This repo covers what runs **on** the cluster.
 charts/
   inventory-api/     # application chart (the Node.js API from jenkins-ci-cd-pipeline)
 platform/            # cluster add-ons: values + install notes (planned)
-.github/workflows/   # helm lint + render + schema validation on every PR (planned)
+.github/workflows/   # helm lint + render + kubeconform on every PR
 ```
+
+## Quick start
+
+```bash
+helm lint charts/inventory-api --strict
+helm template demo charts/inventory-api -f charts/inventory-api/ci/production-values.yaml
+```
+
+See [charts/inventory-api/README.md](charts/inventory-api/README.md) for install and values.
 
 ## Principles
 
@@ -32,8 +41,8 @@ platform/            # cluster add-ons: values + install notes (planned)
 | Step | Status |
 |---|---|
 | Repo skeleton | Done |
-| `inventory-api` chart: Deployment, Service, ServiceAccount (IRSA) | Planned |
-| HPA, PDB, ALB Ingress, NetworkPolicy, values schema | Planned |
-| CI: `helm lint`, `helm template` + kubeconform | Planned |
+| `inventory-api` chart: Deployment, Service, ServiceAccount (IRSA) | Done |
+| HPA, PDB, ALB Ingress, NetworkPolicy, values schema | Done |
+| CI: `helm lint`, `helm template` + kubeconform, negative tests | Done |
 | Platform add-ons: AWS Load Balancer Controller, metrics-server, External Secrets, Karpenter | Planned |
 | GitOps with Argo CD (app-of-apps) | Planned |
