@@ -1,0 +1,70 @@
+# Values for argo/argo-cd. Argo CD is the only add-on installed by hand (gitops/bootstrap.sh); from
+# then on it installs and upgrades everything else in this repo from Git.
+global:
+  domain: argocd.example.com
+
+configs:
+  params:
+    # TLS ends at the ALB, so the server speaks plain HTTP inside the cluster.
+    server.insecure: true
+  cm:
+    # Local admin is for break-glass only; day-to-day access should come through SSO (dex/OIDC).
+    admin.enabled: true
+    exec.enabled: false
+    # Argo CD stopped assessing Application health in v1.8, so sync waves in an app-of-apps would not
+    # wait for the previous wave to be Healthy. This restores it: metrics-server and the load balancer
+    # controller are up before External Secrets, and the CRDs exist before anything that uses them.
+    resource.customizations.health.argoproj.io_Application: |
+      hs = {}
+      hs.status = "Progressing"
+      hs.message = ""
+      if obj.status ~= nil and obj.status.health ~= nil then
+        hs.status = obj.status.health.status
+        if obj.status.health.message ~= nil then
+          hs.message = obj.status.health.message
+        end
+      end
+      return hs
+  rbac:
+    # Anyone who can log in can look, nobody can change anything unless granted a role.
+    policy.default: role:readonly
+
+dex:
+  enabled: false
+
+# Two replicas of everything stateless, so a node drain or a Spot interruption never takes Argo CD down.
+server:
+  replicas: 2
+  pdb:
+    enabled: true
+    minAvailable: 1
+  ingress:
+    enabled: true
+    controller: aws
+    ingressClassName: alb
+    annotations:
+      alb.ingress.kubernetes.io/scheme: internal
+      alb.ingress.kubernetes.io/target-type: ip
+      alb.ingress.kubernetes.io/listen-ports: '[{"HTTPS":443}]'
+      alb.ingress.kubernetes.io/ssl-redirect: "443"
+
+repoServer:
+  replicas: 2
+  pdb:
+    enabled: true
+    minAvailable: 1
+
+applicationSet:
+  replicas: 2
+
+controller:
+  resources:
+    requests:
+      cpu: 250m
+      memory: 512Mi
+    limits:
+      memory: 1Gi
+
+# A single Redis is fine for a cache Argo CD can rebuild; redis-ha needs at least 3 nodes.
+redis-ha:
+  enabled: false
