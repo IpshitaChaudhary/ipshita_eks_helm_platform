@@ -1,0 +1,35 @@
+# Application workloads. Charts come only from this repo, they deploy only into their own
+# namespaces, and the only cluster-scoped object they may create is their Namespace. An app chart
+# can therefore never install a CRD, a ClusterRole or a webhook, even by mistake.
+apiVersion: argoproj.io/v1alpha1
+kind: AppProject
+metadata:
+  name: apps
+  namespace: argocd
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  description: Application workloads
+  sourceRepos:
+    - https://github.com/IpshitaChaudhary/ipshita_eks_helm_platform.git
+  destinations:
+    - server: https://kubernetes.default.svc
+      namespace: inventory-api
+  clusterResourceWhitelist:
+    - group: ""
+      kind: Namespace
+  # ResourceQuota and LimitRange belong to the platform team, not to the app.
+  namespaceResourceBlacklist:
+    - group: ""
+      kind: ResourceQuota
+    - group: ""
+      kind: LimitRange
+  roles:
+    # CI may sync an app after pushing a new image tag, but cannot change the app definition.
+    - name: ci-deployer
+      description: Sync permission for the deploy pipeline
+      policies:
+        - p, proj:apps:ci-deployer, applications, get, apps/*, allow
+        - p, proj:apps:ci-deployer, applications, sync, apps/*, allow
+  orphanedResources:
+    warn: true

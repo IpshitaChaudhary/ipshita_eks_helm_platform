@@ -1,0 +1,35 @@
+# Cluster add-ons. The only project allowed to create cluster-scoped resources (CRDs, webhooks,
+# ClusterRoles, NodePools), and only from the pinned chart repositories and this repo.
+apiVersion: argoproj.io/v1alpha1
+kind: AppProject
+metadata:
+  name: platform
+  namespace: argocd
+  # Deleting the project while Applications still use it would orphan the whole platform.
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  description: Cluster add-ons managed by the platform team
+  sourceRepos:
+    - https://github.com/IpshitaChaudhary/ipshita_eks_helm_platform.git
+    - https://argoproj.github.io/argo-helm
+    - https://aws.github.io/eks-charts
+    - https://kubernetes-sigs.github.io/metrics-server
+    - https://charts.external-secrets.io
+    - public.ecr.aws/karpenter
+  destinations:
+    - server: https://kubernetes.default.svc
+      namespace: argocd
+    - server: https://kubernetes.default.svc
+      namespace: kube-system
+    - server: https://kubernetes.default.svc
+      namespace: external-secrets
+    # Cluster-scoped objects (CRDs, NodePools) have no namespace.
+    - server: https://kubernetes.default.svc
+      namespace: ""
+  clusterResourceWhitelist:
+    - group: "*"
+      kind: "*"
+  # Warn in the UI about anything in these namespaces that Git does not know about.
+  orphanedResources:
+    warn: true
