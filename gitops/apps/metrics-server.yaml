@@ -1,0 +1,29 @@
+# Same pinned chart and values file as platform/install.sh, so both install paths stay identical.
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: metrics-server
+  namespace: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "-4"
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: platform
+  sources:
+    - repoURL: https://kubernetes-sigs.github.io/metrics-server
+      chart: metrics-server
+      targetRevision: 3.12.1
+      helm:
+        valueFiles:
+          - $values/platform/metrics-server/values.yaml
+    - repoURL: https://github.com/IpshitaChaudhary/ipshita_eks_helm_platform.git
+      targetRevision: main
+      ref: values
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: kube-system
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true

@@ -6,6 +6,9 @@ kind: AppProject
 metadata:
   name: apps
   namespace: argocd
+  annotations:
+    # Projects and repositories first: every Application below references them.
+    argocd.argoproj.io/sync-wave: "-10"
   finalizers:
     - resources-finalizer.argocd.argoproj.io
 spec:

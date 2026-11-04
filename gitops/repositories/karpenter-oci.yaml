@@ -1,0 +1,16 @@
+# Karpenter publishes its chart only as an OCI artifact; Argo CD needs it declared as an OCI Helm
+# repository. Public registry, so there are no credentials in this Secret.
+apiVersion: v1
+kind: Secret
+metadata:
+  name: repo-karpenter-oci
+  namespace: argocd
+  labels:
+    argocd.argoproj.io/secret-type: repository
+  annotations:
+    argocd.argoproj.io/sync-wave: "-10"
+stringData:
+  name: karpenter
+  type: helm
+  url: public.ecr.aws/karpenter
+  enableOCI: "true"

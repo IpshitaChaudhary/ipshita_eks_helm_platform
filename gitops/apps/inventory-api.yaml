@@ -1,0 +1,42 @@
+# The application: its chart plus the ExternalSecret that feeds it, deployed last so the load
+# balancer controller, the secret store and autoscaling are already in place.
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: inventory-api
+  namespace: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "0"
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: apps
+  sources:
+    - repoURL: https://github.com/IpshitaChaudhary/ipshita_eks_helm_platform.git
+      targetRevision: main
+      path: charts/inventory-api
+      helm:
+        valueFiles:
+          - ci/production-values.yaml
+    - repoURL: https://github.com/IpshitaChaudhary/ipshita_eks_helm_platform.git
+      targetRevision: main
+      path: platform/external-secrets/manifests
+      directory:
+        include: inventory-api-external-secret.yaml
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: inventory-api
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
+      # Apply resources that changed only, so a sync never touches unrelated objects.
+      - ApplyOutOfSyncOnly=true
+    retry:
+      limit: 5
+      backoff:
+        duration: 10s
+        factor: 2
+        maxDuration: 3m

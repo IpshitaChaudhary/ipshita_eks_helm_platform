@@ -1,0 +1,30 @@
+# App-of-apps root, applied once by bootstrap.sh. It syncs the projects, the repository config and
+# one Application per add-on/app from gitops/; adding a file there is how something new is deployed.
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: root
+  namespace: argocd
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: platform
+  source:
+    repoURL: https://github.com/IpshitaChaudhary/ipshita_eks_helm_platform.git
+    targetRevision: main
+    path: gitops
+    directory:
+      include: "{projects/*.yaml,repositories/*.yaml,apps/*.yaml}"
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: argocd
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    retry:
+      limit: 5
+      backoff:
+        duration: 10s
+        factor: 2
+        maxDuration: 3m

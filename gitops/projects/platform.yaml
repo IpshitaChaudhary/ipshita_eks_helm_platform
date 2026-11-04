@@ -5,6 +5,9 @@ kind: AppProject
 metadata:
   name: platform
   namespace: argocd
+  annotations:
+    # Projects and repositories first: every Application below references them.
+    argocd.argoproj.io/sync-wave: "-10"
   # Deleting the project while Applications still use it would orphan the whole platform.
   finalizers:
     - resources-finalizer.argocd.argoproj.io
