@@ -47,7 +47,8 @@ Sync waves bring the cluster up in order, and Argo CD waits for each wave to be 
 | -5 | Argo CD (manages its own upgrades) |
 | -4 | metrics-server, AWS Load Balancer Controller |
 | -3 | External Secrets, Karpenter (operators + CRDs) |
-| -2 | ClusterSecretStore, EC2NodeClass + NodePool |
+| -2 | ClusterSecretStore, EC2NodeClass + NodePool, monitoring StorageClass + Grafana secret |
+| -1 | kube-prometheus-stack (its CRDs must exist before apps ship ServiceMonitors) |
 | 0 | inventory-api + its ExternalSecret |
 
 Per cluster, only the values in `gitops/apps/*.yaml` change (cluster name, region, VPC, IRSA role ARNs);
