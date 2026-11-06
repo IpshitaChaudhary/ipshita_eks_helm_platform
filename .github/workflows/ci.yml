@@ -48,9 +48,12 @@ jobs:
             for values in "$chart"ci/*-values.yaml; do
               echo "::group::render ${values}"
               helm lint "$chart" --strict -f "$values"
-              # -strict rejects unknown fields; -summary prints a per-file result.
+              # -strict rejects unknown fields; -summary prints a per-file result. The CRD catalog
+              # covers ServiceMonitor / PrometheusRule (monitoring.coreos.com).
               helm template ci "$chart" -f "$values" --kube-version "$KUBE_VERSION" \
-                | kubeconform -strict -summary -kubernetes-version "$KUBE_VERSION"
+                | kubeconform -strict -summary -kubernetes-version "$KUBE_VERSION" \
+                    -schema-location default \
+                    -schema-location 'https://raw.githubusercontent.com/datreeio/CRDs-catalog/main/{{.Group}}/{{.ResourceKind}}_{{.ResourceAPIVersion}}.json'
               echo "::endgroup::"
             done
           done
@@ -70,6 +73,8 @@ jobs:
           expect_fail --set ingress.enabled=true
           expect_fail --set serviceAccount.roleArn=not-an-arn
           expect_fail --set autoscaling.minReplicas=5 --set autoscaling.maxReplicas=3
+          expect_fail --set metrics.serviceMonitor.path=metrics
+          expect_fail --set metrics.prometheusRule.errorRatePercent=0
 
   # Platform add-ons: the install script, every pinned chart rendered with our values, and our own
   # manifests validated against the Karpenter / External Secrets CRD schemas.
@@ -153,6 +158,7 @@ jobs:
           check "$(pinned LBC_CHART_VERSION platform/install.sh)" "$(app_rev aws-load-balancer-controller aws-load-balancer-controller.yaml)" aws-load-balancer-controller
           check "$(pinned ESO_CHART_VERSION platform/install.sh)" "$(app_rev external-secrets external-secrets.yaml)" external-secrets
           check "$(pinned KARPENTER_CHART_VERSION platform/install.sh)" "$(app_rev karpenter karpenter.yaml)" karpenter
+          check "$(pinned KUBE_PROMETHEUS_STACK_CHART_VERSION platform/install.sh)" "$(app_rev kube-prometheus-stack kube-prometheus-stack.yaml)" kube-prometheus-stack
           check "$(pinned ARGOCD_CHART_VERSION gitops/bootstrap.sh)" "$(app_rev argo-cd argo-cd.yaml)" argo-cd
           exit $fail
 

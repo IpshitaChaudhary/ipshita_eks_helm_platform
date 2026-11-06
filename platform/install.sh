@@ -20,6 +20,7 @@ LBC_CHART_VERSION=1.8.1
 METRICS_SERVER_CHART_VERSION=3.12.1
 ESO_CHART_VERSION=0.10.7
 KARPENTER_CHART_VERSION=1.1.7
+KUBE_PROMETHEUS_STACK_CHART_VERSION=65.1.1
 
 # install <release> <namespace> <chart> <version> <values-file> [extra helm args...]
 install() {
@@ -50,6 +51,7 @@ apply_manifest() {
 helm repo add eks https://aws.github.io/eks-charts --force-update >/dev/null
 helm repo add metrics-server https://kubernetes-sigs.github.io/metrics-server --force-update >/dev/null
 helm repo add external-secrets https://charts.external-secrets.io --force-update >/dev/null
+helm repo add prometheus-community https://prometheus-community.github.io/helm-charts --force-update >/dev/null
 helm repo update >/dev/null
 
 install metrics-server kube-system metrics-server/metrics-server \
@@ -70,6 +72,15 @@ install external-secrets external-secrets external-secrets/external-secrets \
 # ExternalSecrets (e.g. external-secrets/manifests/inventory-api-external-secret.yaml) ship with
 # each app, because their namespace belongs to the app.
 apply_manifest external-secrets/manifests/cluster-secret-store.yaml
+
+# Monitoring: the gp3 class its volumes use and the Grafana admin Secret must exist before the
+# chart, or the Prometheus PVC stays Pending and Grafana can't start.
+apply_manifest kube-prometheus-stack/manifests/storageclass-gp3.yaml
+if ! $DRY_RUN; then
+  kubectl create namespace monitoring --dry-run=client -o yaml | kubectl apply -f -
+fi
+apply_manifest kube-prometheus-stack/manifests/grafana-admin-external-secret.yaml
+install kube-prometheus-stack monitoring prometheus-community/kube-prometheus-stack   "$KUBE_PROMETHEUS_STACK_CHART_VERSION" kube-prometheus-stack/values.yaml
 
 # Karpenter last: everything above runs on the managed node group, and nodes Karpenter adds are
 # only useful once the controllers that serve their pods exist.

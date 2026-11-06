@@ -1,0 +1,42 @@
+{{- if .Values.metrics.prometheusRule.enabled }}
+{{- $name := include "inventory-api.fullname" . }}
+{{- $ns := .Release.Namespace }}
+{{- $rule := .Values.metrics.prometheusRule }}
+# Alerts that page on symptoms users feel (errors, no capacity), not on every pod blip.
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: {{ $name }}
+  labels:
+    {{- include "inventory-api.labels" . | nindent 4 }}
+spec:
+  groups:
+    - name: {{ $name }}.rules
+      rules:
+        - alert: InventoryApiHighErrorRate
+          expr: |
+            sum(rate(http_requests_total{namespace="{{ $ns }}", job="{{ $name }}", status=~"5.."}[5m]))
+              / sum(rate(http_requests_total{namespace="{{ $ns }}", job="{{ $name }}"}[5m]))
+              * 100 > {{ $rule.errorRatePercent }}
+          for: 10m
+          labels:
+            severity: critical
+          annotations:
+            summary: "{{ $name }}: more than {{ $rule.errorRatePercent }}% of requests return 5xx"
+        - alert: InventoryApiReplicasUnavailable
+          expr: |
+            kube_deployment_status_replicas_available{namespace="{{ $ns }}", deployment="{{ $name }}"}
+              < kube_deployment_spec_replicas{namespace="{{ $ns }}", deployment="{{ $name }}"}
+          for: 15m
+          labels:
+            severity: warning
+          annotations:
+            summary: "{{ $name }} has had fewer ready replicas than desired for 15 minutes"
+        - alert: InventoryApiCrashLooping
+          expr: |
+            increase(kube_pod_container_status_restarts_total{namespace="{{ $ns }}", pod=~"{{ $name }}-.*"}[30m]) > {{ $rule.maxRestartsPer30m }}
+          labels:
+            severity: warning
+          annotations:
+            summary: "{{ "{{" }} $labels.pod {{ "}}" }} restarted more than {{ $rule.maxRestartsPer30m }} times in 30 minutes"
+{{- end }}
