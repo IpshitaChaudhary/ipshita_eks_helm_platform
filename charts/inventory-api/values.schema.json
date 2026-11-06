@@ -92,6 +92,29 @@
         "allowFromNamespaces": { "type": "array", "items": { "type": "string" } },
         "allowFromCIDRs": { "type": "array", "items": { "type": "string" } }
       }
+    },
+    "metrics": {
+      "type": "object",
+      "properties": {
+        "prometheusNamespace": { "type": "string", "minLength": 1 },
+        "serviceMonitor": {
+          "type": "object",
+          "properties": {
+            "enabled": { "type": "boolean" },
+            "path": { "type": "string", "pattern": "^/" },
+            "interval": { "type": "string", "pattern": "^[0-9]+(ms|s|m|h)$" },
+            "scrapeTimeout": { "type": "string", "pattern": "^[0-9]+(ms|s|m|h)$" }
+          }
+        },
+        "prometheusRule": {
+          "type": "object",
+          "properties": {
+            "enabled": { "type": "boolean" },
+            "errorRatePercent": { "type": "number", "exclusiveMinimum": 0, "maximum": 100 },
+            "maxRestartsPer30m": { "type": "integer", "minimum": 1 }
+          }
+        }
+      }
     }
   }
 }

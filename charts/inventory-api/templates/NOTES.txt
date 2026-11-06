@@ -21,3 +21,8 @@ WARNING: networkPolicy is enabled with no allowed sources, so all ingress to the
 {{- end }}
 
 Roll back: helm rollback {{ .Release.Name }} -n {{ .Release.Namespace }}
+{{- if and .Values.metrics.serviceMonitor.enabled .Values.networkPolicy.enabled (not (has .Values.metrics.prometheusNamespace .Values.networkPolicy.allowFromNamespaces)) }}
+
+WARNING: the ServiceMonitor is on but the NetworkPolicy blocks namespace {{ .Values.metrics.prometheusNamespace }},
+so Prometheus can't scrape the pods. Add it to networkPolicy.allowFromNamespaces.
+{{- end }}

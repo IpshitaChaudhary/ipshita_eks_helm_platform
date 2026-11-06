@@ -116,6 +116,21 @@ ingress:
   scheme: internet-facing
   annotations: {}
 
+# Prometheus scraping and alerts (needs platform/kube-prometheus-stack for the CRDs).
+# The app must expose Prometheus metrics (e.g. prom-client's http_requests_total) on the http port.
+# With networkPolicy on, add the Prometheus namespace to networkPolicy.allowFromNamespaces.
+metrics:
+  prometheusNamespace: monitoring
+  serviceMonitor:
+    enabled: false
+    path: /metrics
+    interval: 30s
+    scrapeTimeout: 10s
+  prometheusRule:
+    enabled: false
+    errorRatePercent: 5
+    maxRestartsPer30m: 3
+
 networkPolicy:
   enabled: true
   # Namespaces allowed to reach the app (matched on kubernetes.io/metadata.name).

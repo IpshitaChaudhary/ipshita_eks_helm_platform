@@ -1,4 +1,4 @@
-# Everything on: IRSA, HTTPS ALB Ingress on a shared ALB, VPC-scoped NetworkPolicy.
+# Everything on: IRSA, HTTPS ALB Ingress on a shared ALB, VPC-scoped NetworkPolicy, metrics + alerts.
 image:
   repository: 111122223333.dkr.ecr.us-east-1.amazonaws.com/inventory-api
   tag: 3f9c2ab
@@ -17,3 +17,8 @@ networkPolicy:
   allowFromCIDRs: [10.0.0.0/16]
 autoscaling:
   maxReplicas: 10
+metrics:
+  serviceMonitor:
+    enabled: true
+  prometheusRule:
+    enabled: true
