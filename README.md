@@ -13,6 +13,7 @@ This repo covers what runs **on** the cluster.
 charts/
   inventory-api/     # application chart (the Node.js API from jenkins-ci-cd-pipeline)
 platform/            # cluster add-ons: pinned values, manifests and an ordered install.sh
+gitops/              # Argo CD app-of-apps: bootstrap.sh, root app, projects, one Application per add-on/app
 .github/workflows/   # helm lint + render + kubeconform on every PR
 ```
 
@@ -24,6 +25,33 @@ helm template demo charts/inventory-api -f charts/inventory-api/ci/production-va
 ```
 
 See [charts/inventory-api/README.md](charts/inventory-api/README.md) for install and values.
+
+## GitOps with Argo CD
+
+Two ways to install the platform, from the same pinned chart versions and values files:
+
+- `platform/install.sh`: imperative, for a cluster without Argo CD.
+- `gitops/bootstrap.sh`: installs Argo CD only and applies `gitops/root-app.yaml`. From then on Argo CD
+  installs and upgrades everything from `main`, including itself. Changes go through a PR, never `kubectl`.
+
+```bash
+./gitops/bootstrap.sh --dry-run   # render only
+./gitops/bootstrap.sh             # install Argo CD and hand the cluster to Git
+```
+
+Sync waves bring the cluster up in order, and Argo CD waits for each wave to be Healthy:
+
+| Wave | What |
+|---|---|
+| -10 | AppProjects `platform` and `apps`, Karpenter OCI repository |
+| -5 | Argo CD (manages its own upgrades) |
+| -4 | metrics-server, AWS Load Balancer Controller |
+| -3 | External Secrets, Karpenter (operators + CRDs) |
+| -2 | ClusterSecretStore, EC2NodeClass + NodePool |
+| 0 | inventory-api + its ExternalSecret |
+
+Per cluster, only the values in `gitops/apps/*.yaml` change (cluster name, region, VPC, IRSA role ARNs);
+CI fails if an Application and `install.sh` pin different chart versions.
 
 ## Principles
 
@@ -46,4 +74,6 @@ See [charts/inventory-api/README.md](charts/inventory-api/README.md) for install
 | CI: `helm lint`, `helm template` + kubeconform, negative tests | Done |
 | Platform add-ons: AWS Load Balancer Controller, metrics-server, External Secrets, Karpenter | Done |
 | CI: shellcheck, render every pinned add-on chart, CRD schema validation | Done |
-| GitOps with Argo CD (app-of-apps) | Planned |
+| GitOps with Argo CD (app-of-apps), AppProjects, sync waves | Done |
+| CI: render Argo CD, validate Applications, chart version drift check | Done |
+| Observability: kube-prometheus-stack, alerts, dashboards | Planned |

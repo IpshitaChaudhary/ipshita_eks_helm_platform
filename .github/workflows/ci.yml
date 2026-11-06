@@ -110,15 +110,63 @@ jobs:
             -schema-location 'https://raw.githubusercontent.com/datreeio/CRDs-catalog/main/{{.Group}}/{{.ResourceKind}}_{{.ResourceAPIVersion}}.json' \
             platform/*/manifests/
 
+  # GitOps: the Argo CD bootstrap, the Application/AppProject manifests, and a guard that the
+  # Applications pin the same chart versions as install.sh (two install paths, one set of versions).
+  gitops:
+    name: GitOps (Argo CD)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: azure/setup-helm@v4
+        with:
+          version: ${{ env.HELM_VERSION }}
+
+      - name: Install kubeconform
+        run: |
+          curl -sSL "https://github.com/yannh/kubeconform/releases/download/${KUBECONFORM_VERSION}/kubeconform-linux-amd64.tar.gz" \
+            | tar -xz -C /usr/local/bin kubeconform
+
+      - name: shellcheck bootstrap.sh
+        run: shellcheck gitops/bootstrap.sh
+
+      - name: Render Argo CD (bootstrap.sh --dry-run)
+        run: ./gitops/bootstrap.sh --dry-run > rendered.yaml && grep -c '^kind:' rendered.yaml
+
+      - name: Validate Applications, AppProjects and repository secrets (CRD schemas)
+        run: |
+          kubeconform -strict -summary -kubernetes-version 1.31.0 \
+            -schema-location default \
+            -schema-location 'https://raw.githubusercontent.com/datreeio/CRDs-catalog/main/{{.Group}}/{{.ResourceKind}}_{{.ResourceAPIVersion}}.json' \
+            gitops/
+
+      - name: Chart versions match install.sh / bootstrap.sh
+        run: |
+          set -euo pipefail
+          pinned() { grep -E "^$1=" "$2" | cut -d= -f2; }
+          app_rev() { grep -A1 "chart: $1\$" "gitops/apps/$2" | awk '/targetRevision:/ {print $2}'; }
+          fail=0
+          check() {
+            if [ "$1" != "$2" ]; then echo "::error::$3: script pins $1, Application pins $2"; fail=1; fi
+          }
+          check "$(pinned METRICS_SERVER_CHART_VERSION platform/install.sh)" "$(app_rev metrics-server metrics-server.yaml)" metrics-server
+          check "$(pinned LBC_CHART_VERSION platform/install.sh)" "$(app_rev aws-load-balancer-controller aws-load-balancer-controller.yaml)" aws-load-balancer-controller
+          check "$(pinned ESO_CHART_VERSION platform/install.sh)" "$(app_rev external-secrets external-secrets.yaml)" external-secrets
+          check "$(pinned KARPENTER_CHART_VERSION platform/install.sh)" "$(app_rev karpenter karpenter.yaml)" karpenter
+          check "$(pinned ARGOCD_CHART_VERSION gitops/bootstrap.sh)" "$(app_rev argo-cd argo-cd.yaml)" argo-cd
+          exit $fail
+
   # Single required status check for branch protection.
   ci-passed:
     name: ci-passed
     if: always()
-    needs: [charts, platform]
+    needs: [charts, platform, gitops]
     runs-on: ubuntu-latest
     steps:
       - name: All checks green
         run: |
-          if [ "${{ needs.charts.result }}" != "success" ] || [ "${{ needs.platform.result }}" != "success" ]; then
-            echo "charts: ${{ needs.charts.result }}, platform: ${{ needs.platform.result }}"; exit 1
+          if [ "${{ needs.charts.result }}" != "success" ] || [ "${{ needs.platform.result }}" != "success" ] \
+             || [ "${{ needs.gitops.result }}" != "success" ]; then
+            echo "charts: ${{ needs.charts.result }}, platform: ${{ needs.platform.result }}, gitops: ${{ needs.gitops.result }}"
+            exit 1
           fi

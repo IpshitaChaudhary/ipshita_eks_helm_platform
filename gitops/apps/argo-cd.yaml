@@ -1,0 +1,30 @@
+# Argo CD manages its own upgrades: bump targetRevision here (and in bootstrap.sh) and merge.
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: argo-cd
+  namespace: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "-5"
+spec:
+  project: platform
+  sources:
+    - repoURL: https://argoproj.github.io/argo-helm
+      chart: argo-cd
+      targetRevision: 10.11.7
+      helm:
+        releaseName: argocd
+        valueFiles:
+          - $values/platform/argo-cd/values.yaml
+    - repoURL: https://github.com/IpshitaChaudhary/ipshita_eks_helm_platform.git
+      targetRevision: main
+      ref: values
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: argocd
+  syncPolicy:
+    # No auto-prune for Argo CD itself: a bad render must never delete the controller doing the sync.
+    automated:
+      selfHeal: true
+    syncOptions:
+      - ServerSideApply=true

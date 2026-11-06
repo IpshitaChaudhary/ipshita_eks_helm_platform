@@ -1,0 +1,20 @@
+# EC2NodeClass and NodePool, after the Karpenter CRDs exist (wave -3). No auto-prune: deleting a
+# NodePool drains and terminates every node it launched, so that must be a deliberate manual sync.
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: karpenter-nodepools
+  namespace: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "-2"
+spec:
+  project: platform
+  source:
+    repoURL: https://github.com/IpshitaChaudhary/ipshita_eks_helm_platform.git
+    targetRevision: main
+    path: platform/karpenter/manifests
+  destination:
+    server: https://kubernetes.default.svc
+  syncPolicy:
+    automated:
+      selfHeal: true

@@ -1,0 +1,37 @@
+# Cluster-specific values (cluster name, region, VPC, IRSA role) are the only lines to change per
+# cluster; everything else comes from platform/aws-load-balancer-controller/values.yaml.
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: aws-load-balancer-controller
+  namespace: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "-4"
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: platform
+  sources:
+    - repoURL: https://aws.github.io/eks-charts
+      chart: aws-load-balancer-controller
+      targetRevision: 1.8.1
+      helm:
+        valueFiles:
+          - $values/platform/aws-load-balancer-controller/values.yaml
+        valuesObject:
+          clusterName: example-cluster
+          region: us-east-1
+          vpcId: vpc-0123456789abcdef0
+          serviceAccount:
+            annotations:
+              eks.amazonaws.com/role-arn: arn:aws:iam::111122223333:role/example-cluster-aws-lbc
+    - repoURL: https://github.com/IpshitaChaudhary/ipshita_eks_helm_platform.git
+      targetRevision: main
+      ref: values
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: kube-system
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
