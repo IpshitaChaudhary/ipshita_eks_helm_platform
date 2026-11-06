@@ -77,4 +77,6 @@ CI fails if an Application and `install.sh` pin different chart versions.
 | CI: shellcheck, render every pinned add-on chart, CRD schema validation | Done |
 | GitOps with Argo CD (app-of-apps), AppProjects, sync waves | Done |
 | CI: render Argo CD, validate Applications, chart version drift check | Done |
-| Observability: kube-prometheus-stack, alerts, dashboards | Planned |
+| Observability: kube-prometheus-stack, ServiceMonitor, PrometheusRule alerts | Done |
+| CI: CRD validation for monitoring resources, chart version drift check | Done |
+| Grafana dashboards as code, Alertmanager routing | Planned |
