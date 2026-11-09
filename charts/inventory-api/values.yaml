@@ -130,6 +130,10 @@ metrics:
     enabled: false
     errorRatePercent: 5
     maxRestartsPer30m: 3
+  # Grafana dashboard (dashboards/inventory-api.json) as a ConfigMap for the Grafana sidecar.
+  # It has namespace/release pickers, so enable it on one release per cluster (fixed dashboard uid).
+  grafanaDashboard:
+    enabled: false
 
 networkPolicy:
   enabled: true

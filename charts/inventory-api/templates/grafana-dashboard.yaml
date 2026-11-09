@@ -1,0 +1,14 @@
+{{- if .Values.metrics.grafanaDashboard.enabled }}
+# Picked up by the Grafana sidecar in platform/kube-prometheus-stack (it watches every namespace for
+# ConfigMaps with this label), so the dashboard ships and rolls back with the app.
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "inventory-api.fullname" . }}-dashboard
+  labels:
+    {{- include "inventory-api.labels" . | nindent 4 }}
+    grafana_dashboard: "1"
+data:
+  inventory-api.json: |-
+    {{- .Files.Get "dashboards/inventory-api.json" | nindent 4 }}
+{{- end }}

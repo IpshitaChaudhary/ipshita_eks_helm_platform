@@ -74,12 +74,14 @@ install external-secrets external-secrets external-secrets/external-secrets \
 apply_manifest external-secrets/manifests/cluster-secret-store.yaml
 
 # Monitoring: the gp3 class its volumes use and the Grafana admin Secret must exist before the
-# chart, or the Prometheus PVC stays Pending and Grafana can't start.
+# chart, or the Prometheus PVC stays Pending and Grafana can't start (and Alertmanager can't mount
+# its Slack webhook Secret).
 apply_manifest kube-prometheus-stack/manifests/storageclass-gp3.yaml
 if ! $DRY_RUN; then
   kubectl create namespace monitoring --dry-run=client -o yaml | kubectl apply -f -
 fi
 apply_manifest kube-prometheus-stack/manifests/grafana-admin-external-secret.yaml
+apply_manifest kube-prometheus-stack/manifests/alertmanager-slack-external-secret.yaml
 install kube-prometheus-stack monitoring prometheus-community/kube-prometheus-stack   "$KUBE_PROMETHEUS_STACK_CHART_VERSION" kube-prometheus-stack/values.yaml
 
 # Karpenter last: everything above runs on the managed node group, and nodes Karpenter adds are

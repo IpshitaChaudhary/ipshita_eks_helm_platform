@@ -59,3 +59,8 @@ export KARPENTER_QUEUE=example-cluster-karpenter-interruptions
 - **Prometheus can't fill its disk.** 15 days or 45 GB on a 50 GiB encrypted gp3 volume, whichever
   comes first. Grafana's admin login comes from Secrets Manager (`platform/grafana-admin`), and it
   is reachable only through an internal ALB.
+- **Alerts reach people, plumbing doesn't.** Alertmanager sends `critical` to `#alerts-critical`
+  (repeats hourly) and everything else to `#alerts-warning` (every 4 hours). `Watchdog`,
+  `InfoInhibitor` and `info` alerts go to a null receiver, and a critical alert inhibits the
+  warning with the same name. The Slack webhook comes from Secrets Manager
+  (`platform/alertmanager-slack`, key `webhook-url`) and is read from a mounted file.
