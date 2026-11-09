@@ -58,6 +58,18 @@ jobs:
             done
           done
 
+      # Dashboards must parse, and take the data source from the $datasource variable so they work
+      # on any Grafana, not only the one they were exported from.
+      - name: Grafana dashboards
+        run: |
+          set -euo pipefail
+          for f in charts/*/dashboards/*.json; do
+            jq -e '.uid and .title' "$f" >/dev/null || { echo "::error file=$f::missing uid or title"; exit 1; }
+            bad=$(jq -r '[.panels[] | select(.datasource.uid != "${datasource}") | .title] | join(", ")' "$f")
+            if [ -n "$bad" ]; then echo "::error file=$f::hardcoded data source in: $bad"; exit 1; fi
+            echo "ok: $f"
+          done
+
       # Guard rails must keep failing: these renders are expected to be rejected.
       - name: Negative tests
         run: |
@@ -107,6 +119,28 @@ jobs:
           KARPENTER_ROLE_ARN: arn:aws:iam::111122223333:role/ci-karpenter
           KARPENTER_QUEUE: ci-cluster-karpenter
         run: ./platform/install.sh --dry-run > rendered.yaml && grep -c '^kind:' rendered.yaml
+
+      # The Alertmanager config the chart actually renders, checked by Alertmanager's own tool, plus
+      # route tests so a reordered route can't silently send pages to the wrong place.
+      - name: Alertmanager config and routes (amtool)
+        env:
+          ALERTMANAGER_IMAGE: quay.io/prometheus/alertmanager:v0.27.0
+        run: |
+          set -euo pipefail
+          yq 'select(.kind == "Secret" and .metadata.name == "alertmanager-kube-prometheus-stack-alertmanager")
+              | .data."alertmanager.yaml"' rendered.yaml | base64 -d > alertmanager.yaml
+          amtool() { docker run --rm -v "$PWD:/w" -w /w --entrypoint amtool "$ALERTMANAGER_IMAGE" "$@"; }
+          amtool check-config alertmanager.yaml
+          route() {
+            got=$(amtool config routes test --config.file=alertmanager.yaml "${@:2}")
+            if [ "$got" != "$1" ]; then echo "::error::${*:2} -> $got, expected $1"; exit 1; fi
+            echo "${*:2} -> $got"
+          }
+          route slack-critical alertname=InventoryApiHighErrorRate severity=critical
+          route slack-warning alertname=InventoryApiCrashLooping severity=warning
+          route slack-warning alertname=NoSeverityLabel
+          route null alertname=Watchdog severity=none
+          route null alertname=CPUThrottlingHigh severity=info
 
       - name: Validate platform manifests (CRD schemas)
         run: |
