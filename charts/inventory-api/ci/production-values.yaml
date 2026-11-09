@@ -22,3 +22,5 @@ metrics:
     enabled: true
   prometheusRule:
     enabled: true
+  grafanaDashboard:
+    enabled: true

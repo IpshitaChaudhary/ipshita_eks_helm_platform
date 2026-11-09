@@ -3,7 +3,7 @@ name: inventory-api
 description: Node.js inventory API on EKS - hardened Deployment, IRSA, ALB Ingress, HPA, PDB and NetworkPolicy
 type: application
 # Chart version: bump on every chart change (SemVer).
-version: 0.2.0
+version: 0.3.0
 # Default image tag when image.tag is not set. CI deploys pass the commit SHA instead.
 appVersion: "1.0.0"
 # 1.30+ for the native preStop "sleep" action (no shell needed in the image).
