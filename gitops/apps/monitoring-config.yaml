@@ -1,5 +1,5 @@
 # What kube-prometheus-stack (wave -1) needs before it starts: the gp3 StorageClass for its volumes
-# and the grafana-admin ExternalSecret. External Secrets' CRDs exist from wave -3.
+# and the grafana-admin / alertmanager-slack ExternalSecrets. External Secrets' CRDs exist from wave -3.
 apiVersion: argoproj.io/v1alpha1
 kind: Application
 metadata:
