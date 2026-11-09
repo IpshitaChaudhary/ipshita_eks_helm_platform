@@ -26,6 +26,9 @@ helm upgrade --install inventory-api charts/inventory-api \
 | PodDisruptionBudget | on, `maxUnavailable: 1` | Node drains and upgrades never take all replicas |
 | NetworkPolicy | on, **deny all** | Allowed sources are explicit (`allowFromNamespaces`, `allowFromCIDRs`) |
 | Ingress (ALB) | off | `ip` targets, TLS 1.3 policy, HTTP→HTTPS redirect, optional shared ALB via `groupName` |
+| ServiceMonitor | off | Prometheus scrapes `/metrics` through the Service |
+| PrometheusRule | off | 5xx ratio (critical), missing replicas and crash loops (warning); routed to Slack by Alertmanager |
+| Grafana dashboard (ConfigMap) | off | `dashboards/inventory-api.json`, loaded by the Grafana sidecar; one release per cluster |
 
 ## Key values
 
@@ -38,6 +41,7 @@ helm upgrade --install inventory-api charts/inventory-api \
 | `autoscaling.enabled` | `true` | When `false`, `replicaCount` is used |
 | `ingress.enabled` / `host` / `certificateArn` | `false` / `""` / `""` | `host` is required when enabled |
 | `networkPolicy.allowFromNamespaces` / `allowFromCIDRs` | `[]` | With ALB `ip` targets, add the VPC CIDR |
+| `metrics.serviceMonitor.enabled` / `prometheusRule.enabled` / `grafanaDashboard.enabled` | `false` | Add `monitoring` to `allowFromNamespaces` so Prometheus can scrape |
 
 Every value is type-checked by `values.schema.json`.
 
@@ -57,5 +61,5 @@ The chart refuses to render when:
 | File | Scenario |
 |---|---|
 | `default-values.yaml` | Chart defaults |
-| `production-values.yaml` | IRSA + HTTPS Ingress + scoped NetworkPolicy |
+| `production-values.yaml` | IRSA + HTTPS Ingress + scoped NetworkPolicy + metrics, alerts and dashboard |
 | `no-autoscaling-values.yaml` | Single replica, HPA/PDB/NetworkPolicy off |

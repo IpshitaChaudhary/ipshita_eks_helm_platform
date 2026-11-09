@@ -63,6 +63,8 @@ CI fails if an Application and `install.sh` pin different chart versions.
   spread across nodes and AZs.
 - **Everything renders in CI.** Every chart change is linted, templated and validated against the
   Kubernetes schema before it can merge.
+- **Alerts are code too.** Alert rules ship with the app chart, routing lives in the platform values,
+  and CI proves where each severity lands before a change merges.
 - **No secrets in Git.** Charts reference existing Secrets (or External Secrets); values files never carry credentials.
 
 ## Roadmap
@@ -79,4 +81,5 @@ CI fails if an Application and `install.sh` pin different chart versions.
 | CI: render Argo CD, validate Applications, chart version drift check | Done |
 | Observability: kube-prometheus-stack, ServiceMonitor, PrometheusRule alerts | Done |
 | CI: CRD validation for monitoring resources, chart version drift check | Done |
-| Grafana dashboards as code, Alertmanager routing | Planned |
+| Grafana dashboards as code, Alertmanager routing to Slack by severity | Done |
+| CI: dashboard JSON checks, `amtool check-config` + route tests | Done |
