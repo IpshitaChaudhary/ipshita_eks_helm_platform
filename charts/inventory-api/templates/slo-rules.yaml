@@ -1,6 +1,9 @@
 {{- if .Values.metrics.slo.enabled }}
 {{- $name := include "inventory-api.fullname" . }}
 {{- $sel := printf "namespace=%q, job=%q" .Release.Namespace $name }}
+{{- $obj := .Values.metrics.slo.objective }}
+{{- /* Error budget as a ratio, left to Prometheus to compute so 99.9 doesn't turn into 0.0999999. */}}
+{{- $budget := printf "(100 - %v) / 100" $obj }}
 # SLI recording rules for the availability SLO: the 5xx ratio over every window the burn-rate
 # alerts look at. Recorded once here so the alerts (and dashboards) read cheap pre-computed series
 # instead of re-running rate() over [3d] on every evaluation.
@@ -20,4 +23,51 @@ spec:
             sum by (namespace, job) (rate(http_requests_total{ {{- $sel }}, status=~"5.."}[{{ . }}]))
               / sum by (namespace, job) (rate(http_requests_total{ {{- $sel }}}[{{ . }}]))
         {{- end }}
+    # Multi-window, multi-burn-rate alerts (Google SRE workbook, "Alerting on SLOs"). A burn rate of
+    # 1 spends exactly the 30-day budget in 30 days. Each pair needs the long window (is it real?)
+    # and the short window (is it still happening?), so alerts fire fast and resolve fast.
+    - name: {{ $name }}-slo.alerts
+      rules:
+        # 14.4x for 1h = 2% of the budget gone in an hour; 6x for 6h = 5% gone in six hours.
+        - alert: InventoryApiErrorBudgetFastBurn
+          expr: |
+            (
+              slo:sli_error:ratio_rate1h{ {{- $sel }}} > (14.4 * {{ $budget }})
+              and
+              slo:sli_error:ratio_rate5m{ {{- $sel }}} > (14.4 * {{ $budget }})
+            )
+            or
+            (
+              slo:sli_error:ratio_rate6h{ {{- $sel }}} > (6 * {{ $budget }})
+              and
+              slo:sli_error:ratio_rate30m{ {{- $sel }}} > (6 * {{ $budget }})
+            )
+          for: 2m
+          labels:
+            severity: critical
+            slo: availability
+          annotations:
+            summary: "{{ $name }} is burning its {{ $obj }}% availability error budget fast"
+            description: "At the current 5xx rate the 30-day error budget is gone within 5 days."
+        # 3x for 1d = 10% gone in a day; 1x for 3d = on track to miss the SLO. Not a page.
+        - alert: InventoryApiErrorBudgetSlowBurn
+          expr: |
+            (
+              slo:sli_error:ratio_rate1d{ {{- $sel }}} > (3 * {{ $budget }})
+              and
+              slo:sli_error:ratio_rate2h{ {{- $sel }}} > (3 * {{ $budget }})
+            )
+            or
+            (
+              slo:sli_error:ratio_rate3d{ {{- $sel }}} > (1 * {{ $budget }})
+              and
+              slo:sli_error:ratio_rate6h{ {{- $sel }}} > (1 * {{ $budget }})
+            )
+          for: 15m
+          labels:
+            severity: warning
+            slo: availability
+          annotations:
+            summary: "{{ $name }} is slowly burning its {{ $obj }}% availability error budget"
+            description: "At the current 5xx rate the SLO will be missed before the 30-day window ends."
 {{- end }}

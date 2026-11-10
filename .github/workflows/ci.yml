@@ -87,6 +87,8 @@ jobs:
           expect_fail --set autoscaling.minReplicas=5 --set autoscaling.maxReplicas=3
           expect_fail --set metrics.serviceMonitor.path=metrics
           expect_fail --set metrics.prometheusRule.errorRatePercent=0
+          expect_fail --set metrics.slo.enabled=true --set metrics.slo.objective=100
+          expect_fail --set metrics.slo.enabled=true --set metrics.slo.objective=85
 
   # Platform add-ons: the install script, every pinned chart rendered with our values, and our own
   # manifests validated against the Karpenter / External Secrets CRD schemas.
