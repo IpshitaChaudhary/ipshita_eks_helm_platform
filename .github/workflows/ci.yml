@@ -100,7 +100,9 @@ jobs:
           PROMETHEUS_IMAGE: quay.io/prometheus/prometheus:v2.54.1
         run: |
           set -euo pipefail
-          work=$(mktemp -d)
+          # Not mktemp -d: that is 0700, and promtool runs as nobody inside the container.
+          work="$PWD/promtool-work"
+          mkdir -p "$work"
           helm template ci charts/inventory-api -f charts/inventory-api/ci/production-values.yaml             | yq ea '[select(.kind == "PrometheusRule")] | {"groups": [.[].spec.groups[]]}' > "$work/rules.yaml"
           cp charts/inventory-api/ci/promtool/*-test.yaml "$work/"
           promtool() { docker run --rm -v "$work:/w" -w /w --entrypoint promtool "$PROMETHEUS_IMAGE" "$@"; }
