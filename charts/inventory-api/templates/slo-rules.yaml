@@ -1,0 +1,23 @@
+{{- if .Values.metrics.slo.enabled }}
+{{- $name := include "inventory-api.fullname" . }}
+{{- $sel := printf "namespace=%q, job=%q" .Release.Namespace $name }}
+# SLI recording rules for the availability SLO: the 5xx ratio over every window the burn-rate
+# alerts look at. Recorded once here so the alerts (and dashboards) read cheap pre-computed series
+# instead of re-running rate() over [3d] on every evaluation.
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: {{ $name }}-slo
+  labels:
+    {{- include "inventory-api.labels" . | nindent 4 }}
+spec:
+  groups:
+    - name: {{ $name }}-slo.recording
+      rules:
+        {{- range list "5m" "30m" "1h" "2h" "6h" "1d" "3d" }}
+        - record: slo:sli_error:ratio_rate{{ . }}
+          expr: |
+            sum by (namespace, job) (rate(http_requests_total{ {{- $sel }}, status=~"5.."}[{{ . }}]))
+              / sum by (namespace, job) (rate(http_requests_total{ {{- $sel }}}[{{ . }}]))
+        {{- end }}
+{{- end }}
