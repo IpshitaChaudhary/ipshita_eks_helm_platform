@@ -64,3 +64,16 @@ export KARPENTER_QUEUE=example-cluster-karpenter-interruptions
   `InfoInhibitor` and `info` alerts go to a null receiver, and a critical alert inhibits the
   warning with the same name. The Slack webhook comes from Secrets Manager
   (`platform/alertmanager-slack`, key `webhook-url`) and is read from a mounted file.
+- **The platform watches itself.** `kube-prometheus-stack/platform-monitoring/` scrapes External
+  Secrets and Karpenter and alerts when they stop doing their job. It is applied after
+  kube-prometheus-stack (last in `install.sh`, wave 0 in Argo CD) because both add-ons install
+  before the ServiceMonitor CRD exists. Rules are unit-tested with `promtool`
+  (`kube-prometheus-stack/tests/`).
+
+  | Alert | Severity | What it means for workloads |
+  |---|---|---|
+  | `ExternalSecretNotReady` | warning | A Secret is stale (rotated credentials not picked up) or was never created |
+  | `ExternalSecretsControllerDown` | warning | No Secret is refreshed or created until it is back |
+  | `KarpenterControllerDown` | critical | No scale-out; Spot interruptions are not drained |
+  | `KarpenterCloudProviderErrors` | warning | EC2 calls failing (capacity, quotas, IAM, discovery tags) |
+  | `KarpenterNodePoolNearLimit` | warning | Above 90% of the NodePool CPU limit; at 100% pods stay Pending |

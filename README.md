@@ -87,3 +87,4 @@ CI fails if an Application and `install.sh` pin different chart versions.
 | CI: dashboard JSON checks, `amtool check-config` + route tests | Done |
 | Availability SLO: SLI recording rules, multi-window burn-rate alerts | Done |
 | CI: `promtool check rules` + alert unit tests | Done |
+| Platform self-monitoring: External Secrets + Karpenter scraping and alerts, unit-tested | Done |
