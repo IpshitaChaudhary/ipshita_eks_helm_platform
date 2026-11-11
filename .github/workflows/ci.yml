@@ -181,6 +181,7 @@ jobs:
           promtool check rules rules.yaml
           for t in "$work"/*-test.yaml; do promtool test rules "$(basename "$t")"; done
 
+      - name: Validate platform manifests (CRD schemas)
         run: |
           kubeconform -strict -summary -kubernetes-version 1.31.0 \
             -schema-location default \
