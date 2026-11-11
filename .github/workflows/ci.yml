@@ -170,7 +170,7 @@ jobs:
           kubeconform -strict -summary -kubernetes-version 1.31.0 \
             -schema-location default \
             -schema-location 'https://raw.githubusercontent.com/datreeio/CRDs-catalog/main/{{.Group}}/{{.ResourceKind}}_{{.ResourceAPIVersion}}.json' \
-            platform/*/manifests/
+            platform/*/manifests/ platform/kube-prometheus-stack/platform-monitoring/
 
   # GitOps: the Argo CD bootstrap, the Application/AppProject manifests, and a guard that the
   # Applications pin the same chart versions as install.sh (two install paths, one set of versions).

@@ -94,3 +94,8 @@ install karpenter kube-system oci://public.ecr.aws/karpenter/karpenter \
 
 apply_manifest karpenter/manifests/ec2nodeclass.yaml
 apply_manifest karpenter/manifests/nodepool.yaml
+
+# Scrape configs and alerts for the add-ons themselves. Last, because they need the
+# ServiceMonitor/PrometheusRule CRDs from kube-prometheus-stack and target Karpenter's Service.
+apply_manifest kube-prometheus-stack/platform-monitoring/servicemonitors.yaml
+apply_manifest kube-prometheus-stack/platform-monitoring/platform-alerts.yaml
