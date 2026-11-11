@@ -165,7 +165,22 @@ jobs:
           route null alertname=Watchdog severity=none
           route null alertname=CPUThrottlingHigh severity=info
 
-      - name: Validate platform manifests (CRD schemas)
+      # Platform alerts unit-tested on synthetic metrics: stuck vs recovered ExternalSecret, controller
+      # targets down or missing, EC2 errors per method, NodePool limit not double-counted across
+      # the two Karpenter replicas.
+      - name: Platform alert rules (promtool check + unit tests)
+        env:
+          PROMETHEUS_IMAGE: quay.io/prometheus/prometheus:v2.54.1
+        run: |
+          set -euo pipefail
+          work="$PWD/promtool-work"
+          mkdir -p "$work"
+          yq '{"groups": .spec.groups}' platform/kube-prometheus-stack/platform-monitoring/platform-alerts.yaml > "$work/rules.yaml"
+          cp platform/kube-prometheus-stack/tests/*-test.yaml "$work/"
+          promtool() { docker run --rm -v "$work:/w" -w /w --entrypoint promtool "$PROMETHEUS_IMAGE" "$@"; }
+          promtool check rules rules.yaml
+          for t in "$work"/*-test.yaml; do promtool test rules "$(basename "$t")"; done
+
         run: |
           kubeconform -strict -summary -kubernetes-version 1.31.0 \
             -schema-location default \
