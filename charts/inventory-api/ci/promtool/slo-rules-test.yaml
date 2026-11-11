@@ -1,0 +1,106 @@
+# promtool unit tests for the SLO burn-rate alerts. CI renders the chart with
+# ci/production-values.yaml (release "ci", namespace "default", objective 99.9 => budget 0.1%)
+# and writes every PrometheusRule group to rules.yaml next to this file.
+# Traffic is 1000 req/min in every test; only the share of 5xx changes.
+rule_files:
+  - rules.yaml
+
+evaluation_interval: 1m
+
+tests:
+  # 2% errors = 20x burn: pages (fast burn), and the slow-burn ticket fires too.
+  - name: fast burn pages
+    interval: 1m
+    input_series:
+      - series: 'http_requests_total{namespace="default", job="ci-inventory-api", status="500"}'
+        values: '0+20x90'
+      - series: 'http_requests_total{namespace="default", job="ci-inventory-api", status="200"}'
+        values: '0+980x90'
+    alert_rule_test:
+      - eval_time: 70m
+        alertname: InventoryApiErrorBudgetFastBurn
+        exp_alerts:
+          - exp_labels:
+              namespace: default
+              job: ci-inventory-api
+              severity: critical
+              slo: availability
+            exp_annotations:
+              summary: "ci-inventory-api is burning its 99.9% availability error budget fast"
+              description: "At the current 5xx rate the 30-day error budget is gone within 5 days."
+      - eval_time: 70m
+        alertname: InventoryApiErrorBudgetSlowBurn
+        exp_alerts:
+          - exp_labels:
+              namespace: default
+              job: ci-inventory-api
+              severity: warning
+              slo: availability
+            exp_annotations:
+              summary: "ci-inventory-api is slowly burning its 99.9% availability error budget"
+              description: "At the current 5xx rate the SLO will be missed before the 30-day window ends."
+
+  # 0.5% errors = 5x burn: under the 6x/14.4x page thresholds, over 3x - a ticket, not a page.
+  - name: slow burn only warns
+    interval: 1m
+    input_series:
+      - series: 'http_requests_total{namespace="default", job="ci-inventory-api", status="500"}'
+        values: '0+5x200'
+      - series: 'http_requests_total{namespace="default", job="ci-inventory-api", status="200"}'
+        values: '0+995x200'
+    alert_rule_test:
+      - eval_time: 3h
+        alertname: InventoryApiErrorBudgetFastBurn
+        exp_alerts: []
+      - eval_time: 3h
+        alertname: InventoryApiErrorBudgetSlowBurn
+        exp_alerts:
+          - exp_labels:
+              namespace: default
+              job: ci-inventory-api
+              severity: warning
+              slo: availability
+            exp_annotations:
+              summary: "ci-inventory-api is slowly burning its 99.9% availability error budget"
+              description: "At the current 5xx rate the SLO will be missed before the 30-day window ends."
+
+  # 0.05% errors = half the budget: inside the SLO, nothing fires.
+  - name: within budget is quiet
+    interval: 1m
+    input_series:
+      - series: 'http_requests_total{namespace="default", job="ci-inventory-api", status="500"}'
+        values: '0+1x200'
+      - series: 'http_requests_total{namespace="default", job="ci-inventory-api", status="200"}'
+        values: '0+1999x200'
+    alert_rule_test:
+      - eval_time: 3h
+        alertname: InventoryApiErrorBudgetFastBurn
+        exp_alerts: []
+      - eval_time: 3h
+        alertname: InventoryApiErrorBudgetSlowBurn
+        exp_alerts: []
+
+  # 2% errors for an hour, then fixed. The 1h/6h windows are still hot, but the short windows
+  # (5m, 30m) are clean, so the page clears ~30 minutes after the fix instead of hours later.
+  - name: page clears after the fix
+    interval: 1m
+    input_series:
+      - series: 'http_requests_total{namespace="default", job="ci-inventory-api", status="500"}'
+        values: '0+20x60 1200+0x40'
+      - series: 'http_requests_total{namespace="default", job="ci-inventory-api", status="200"}'
+        values: '0+980x60 59800+1000x40'
+    alert_rule_test:
+      - eval_time: 55m
+        alertname: InventoryApiErrorBudgetFastBurn
+        exp_alerts:
+          - exp_labels:
+              namespace: default
+              job: ci-inventory-api
+              severity: critical
+              slo: availability
+            exp_annotations:
+              summary: "ci-inventory-api is burning its 99.9% availability error budget fast"
+              description: "At the current 5xx rate the 30-day error budget is gone within 5 days."
+      - eval_time: 95m
+        alertname: InventoryApiErrorBudgetFastBurn
+        exp_alerts: []

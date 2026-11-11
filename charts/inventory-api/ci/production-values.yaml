@@ -24,3 +24,5 @@ metrics:
     enabled: true
   grafanaDashboard:
     enabled: true
+  slo:
+    enabled: true

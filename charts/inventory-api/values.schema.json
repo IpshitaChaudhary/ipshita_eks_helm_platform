@@ -119,6 +119,18 @@
           "properties": {
             "enabled": { "type": "boolean" }
           }
+        },
+        "slo": {
+          "type": "object",
+          "properties": {
+            "enabled": { "type": "boolean" },
+            "objective": {
+              "description": "Availability target in percent. Below 90 the burn-rate thresholds stop making sense; 100 leaves no error budget.",
+              "type": "number",
+              "minimum": 90,
+              "exclusiveMaximum": 100
+            }
+          }
         }
       }
     }

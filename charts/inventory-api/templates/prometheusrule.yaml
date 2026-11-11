@@ -13,6 +13,8 @@ spec:
   groups:
     - name: {{ $name }}.rules
       rules:
+        {{- /* With an SLO the burn-rate alerts (slo-rules.yaml) replace the fixed 5xx threshold. */}}
+        {{- if not $.Values.metrics.slo.enabled }}
         - alert: InventoryApiHighErrorRate
           expr: |
             sum(rate(http_requests_total{namespace="{{ $ns }}", job="{{ $name }}", status=~"5.."}[5m]))
@@ -23,6 +25,7 @@ spec:
             severity: critical
           annotations:
             summary: "{{ $name }}: more than {{ $rule.errorRatePercent }}% of requests return 5xx"
+        {{- end }}
         - alert: InventoryApiReplicasUnavailable
           expr: |
             kube_deployment_status_replicas_available{namespace="{{ $ns }}", deployment="{{ $name }}"}

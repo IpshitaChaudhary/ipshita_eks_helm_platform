@@ -64,7 +64,9 @@ CI fails if an Application and `install.sh` pin different chart versions.
 - **Everything renders in CI.** Every chart change is linted, templated and validated against the
   Kubernetes schema before it can merge.
 - **Alerts are code too.** Alert rules ship with the app chart, routing lives in the platform values,
-  and CI proves where each severity lands before a change merges.
+  CI unit-tests the rules with `promtool` and proves where each severity lands before a change merges.
+- **Page on the error budget, not on thresholds.** Burn-rate alerts against an SLO page when users
+  are really affected, and stay quiet for blips the budget can absorb.
 - **No secrets in Git.** Charts reference existing Secrets (or External Secrets); values files never carry credentials.
 
 ## Roadmap
@@ -83,3 +85,5 @@ CI fails if an Application and `install.sh` pin different chart versions.
 | CI: CRD validation for monitoring resources, chart version drift check | Done |
 | Grafana dashboards as code, Alertmanager routing to Slack by severity | Done |
 | CI: dashboard JSON checks, `amtool check-config` + route tests | Done |
+| Availability SLO: SLI recording rules, multi-window burn-rate alerts | Done |
+| CI: `promtool check rules` + alert unit tests | Done |

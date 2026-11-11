@@ -134,6 +134,11 @@ metrics:
   # It has namespace/release pickers, so enable it on one release per cluster (fixed dashboard uid).
   grafanaDashboard:
     enabled: false
+  # Availability SLO: share of requests over 30 days that must not return 5xx. Records the SLI
+  # (5xx ratio) over the windows the multi-window burn-rate alerts need.
+  slo:
+    enabled: false
+    objective: 99.9
 
 networkPolicy:
   enabled: true

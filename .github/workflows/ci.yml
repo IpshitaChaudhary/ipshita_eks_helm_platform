@@ -87,6 +87,27 @@ jobs:
           expect_fail --set autoscaling.minReplicas=5 --set autoscaling.maxReplicas=3
           expect_fail --set metrics.serviceMonitor.path=metrics
           expect_fail --set metrics.prometheusRule.errorRatePercent=0
+          expect_fail --set metrics.slo.enabled=true --set metrics.slo.objective=100
+          expect_fail --set metrics.slo.enabled=true --set metrics.slo.objective=85
+
+      # The rendered alert/recording rules, checked and unit-tested by Prometheus' own tool against
+      # synthetic traffic: fast burn pages, slow burn only warns, in-budget is quiet, and a page
+      # clears once the errors stop. Rules don't depend on the Kubernetes version, so run once.
+      - name: Prometheus rules (promtool check + unit tests)
+        if: matrix.kubernetes == '1.31.0'
+        env:
+          # The Prometheus version kube-prometheus-stack 65.1.1 deploys.
+          PROMETHEUS_IMAGE: quay.io/prometheus/prometheus:v2.54.1
+        run: |
+          set -euo pipefail
+          # Not mktemp -d: that is 0700, and promtool runs as nobody inside the container.
+          work="$PWD/promtool-work"
+          mkdir -p "$work"
+          helm template ci charts/inventory-api -f charts/inventory-api/ci/production-values.yaml             | yq ea '[select(.kind == "PrometheusRule")] | {"groups": [.[].spec.groups[]]}' > "$work/rules.yaml"
+          cp charts/inventory-api/ci/promtool/*-test.yaml "$work/"
+          promtool() { docker run --rm -v "$work:/w" -w /w --entrypoint promtool "$PROMETHEUS_IMAGE" "$@"; }
+          promtool check rules rules.yaml
+          for t in "$work"/*-test.yaml; do promtool test rules "$(basename "$t")"; done
 
   # Platform add-ons: the install script, every pinned chart rendered with our values, and our own
   # manifests validated against the Karpenter / External Secrets CRD schemas.
@@ -138,6 +159,8 @@ jobs:
           }
           route slack-critical alertname=InventoryApiHighErrorRate severity=critical
           route slack-warning alertname=InventoryApiCrashLooping severity=warning
+          route slack-critical alertname=InventoryApiErrorBudgetFastBurn severity=critical slo=availability
+          route slack-warning alertname=InventoryApiErrorBudgetSlowBurn severity=warning slo=availability
           route slack-warning alertname=NoSeverityLabel
           route null alertname=Watchdog severity=none
           route null alertname=CPUThrottlingHigh severity=info
