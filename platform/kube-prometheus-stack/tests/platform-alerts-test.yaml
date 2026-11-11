@@ -1,0 +1,122 @@
+# promtool unit tests for platform-monitoring/platform-alerts.yaml. CI copies the rule groups
+# out of the PrometheusRule into rules.yaml next to this file. Kept outside platform-monitoring/
+# so Argo CD and kubeconform only see Kubernetes manifests there.
+rule_files:
+  - rules.yaml
+
+evaluation_interval: 1m
+
+tests:
+  # One ExternalSecret stuck for 30m fires; one that recovered after 10m does not.
+  - name: external secret not ready
+    interval: 1m
+    input_series:
+      - series: 'externalsecret_status_condition{job="external-secrets-metrics", namespace="inventory", name="inventory-api-secrets", condition="Ready", status="False"}'
+        values: '1x30'
+      - series: 'externalsecret_status_condition{job="external-secrets-metrics", namespace="inventory", name="flaky", condition="Ready", status="False"}'
+        values: '1x10 0x20'
+      - series: 'up{job="external-secrets-metrics"}'
+        values: '1x30'
+    alert_rule_test:
+      - eval_time: 20m
+        alertname: ExternalSecretNotReady
+        exp_alerts:
+          - exp_labels:
+              severity: warning
+              namespace: inventory
+              name: inventory-api-secrets
+            exp_annotations:
+              summary: "ExternalSecret inventory/inventory-api-secrets has not synced for 15 minutes"
+              description: "The Secret keeps its last synced values, but rotated credentials are not picked up and a Secret that was never created blocks new pods. Usually the IRSA role or a missing key in Secrets Manager: kubectl -n inventory describe externalsecret inventory-api-secrets"
+      - eval_time: 20m
+        alertname: ExternalSecretsControllerDown
+        exp_alerts: []
+
+  # The controller's target goes down at 5m; the alert fires once it has been down for 10m.
+  - name: external secrets controller down
+    interval: 1m
+    input_series:
+      - series: 'up{job="external-secrets-metrics"}'
+        values: '1x5 0x20'
+    alert_rule_test:
+      - eval_time: 10m
+        alertname: ExternalSecretsControllerDown
+        exp_alerts: []
+      - eval_time: 20m
+        alertname: ExternalSecretsControllerDown
+        exp_alerts:
+          - exp_labels:
+              severity: warning
+            exp_annotations:
+              summary: "The External Secrets controller has not been scraped for 10 minutes"
+              description: "Existing Secrets stay as they are, but nothing is refreshed or created until the controller in namespace external-secrets is back."
+
+  # No karpenter target at all (e.g. both replicas crash-looping) is as bad as up == 0.
+  - name: karpenter down
+    interval: 1m
+    input_series:
+      - series: 'up{job="some-other-job"}'
+        values: '1x20'
+    alert_rule_test:
+      - eval_time: 15m
+        alertname: KarpenterControllerDown
+        exp_alerts:
+          - exp_labels:
+              severity: critical
+            exp_annotations:
+              summary: "Karpenter has not been scraped for 10 minutes"
+              description: "No new nodes are launched, so pending pods stay pending, and Spot interruption notices are not acted on, so those nodes disappear without draining."
+
+  # Steady InsufficientCapacity errors from EC2 Create; the healthy method stays quiet.
+  - name: karpenter cloud provider errors
+    interval: 1m
+    input_series:
+      - series: 'karpenter_cloudprovider_errors_total{job="karpenter", controller="nodeclaim.lifecycle", method="Create", provider="aws", error="InsufficientCapacityError"}'
+        values: '0+1x40'
+      - series: 'karpenter_cloudprovider_errors_total{job="karpenter", controller="nodeclaim.lifecycle", method="Delete", provider="aws", error="NodeClaimNotFoundError"}'
+        values: '3x40'
+      - series: 'up{job="karpenter"}'
+        values: '1x40'
+    alert_rule_test:
+      - eval_time: 30m
+        alertname: KarpenterCloudProviderErrors
+        exp_alerts:
+          - exp_labels:
+              severity: warning
+              method: Create
+              error: InsufficientCapacityError
+            exp_annotations:
+              summary: "Karpenter EC2 calls failing: Create (InsufficientCapacityError)"
+              description: "Often insufficient capacity for every allowed instance type, a service quota, or the node role / EC2NodeClass discovery tags. Check the karpenter logs in kube-system."
+      - eval_time: 30m
+        alertname: KarpenterControllerDown
+        exp_alerts: []
+
+  # Both controller replicas report the same gauges: 60 of 64 CPUs (94%) fires once, not twice;
+  # a NodePool at 10 of 64 CPUs does not.
+  - name: nodepool near its cpu limit
+    interval: 1m
+    input_series:
+      - series: 'karpenter_nodepools_usage{job="karpenter", pod="karpenter-a", nodepool="default", resource_type="cpu"}'
+        values: '60x30'
+      - series: 'karpenter_nodepools_usage{job="karpenter", pod="karpenter-b", nodepool="default", resource_type="cpu"}'
+        values: '60x30'
+      - series: 'karpenter_nodepools_limit{job="karpenter", pod="karpenter-a", nodepool="default", resource_type="cpu"}'
+        values: '64x30'
+      - series: 'karpenter_nodepools_limit{job="karpenter", pod="karpenter-b", nodepool="default", resource_type="cpu"}'
+        values: '64x30'
+      - series: 'karpenter_nodepools_usage{job="karpenter", pod="karpenter-a", nodepool="batch", resource_type="cpu"}'
+        values: '10x30'
+      - series: 'karpenter_nodepools_limit{job="karpenter", pod="karpenter-a", nodepool="batch", resource_type="cpu"}'
+        values: '64x30'
+    alert_rule_test:
+      - eval_time: 20m
+        alertname: KarpenterNodePoolNearLimit
+        exp_alerts:
+          - exp_labels:
+              severity: warning
+              nodepool: default
+              resource_type: cpu
+            exp_annotations:
+              summary: "NodePool default is above 90% of its CPU limit"
+              description: "At the limit Karpenter stops launching nodes for this NodePool and new pods stay Pending. Raise spec.limits.cpu in karpenter/manifests/nodepool.yaml if the growth is expected."

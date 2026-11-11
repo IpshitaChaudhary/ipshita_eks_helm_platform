@@ -15,6 +15,14 @@ podDisruptionBudget:
   enabled: true
   minAvailable: 1
 
+# Expose the controller's metrics (sync errors, Ready condition per ExternalSecret) as the
+# external-secrets-metrics Service. Scraped by the ServiceMonitor in
+# kube-prometheus-stack/platform-monitoring/, not the chart's own one: the chart installs before
+# kube-prometheus-stack, so the ServiceMonitor CRD doesn't exist yet when it renders.
+metrics:
+  service:
+    enabled: true
+
 resources:
   requests:
     cpu: 50m

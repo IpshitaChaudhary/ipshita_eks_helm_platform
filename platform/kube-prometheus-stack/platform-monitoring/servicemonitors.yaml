@@ -1,0 +1,39 @@
+# Scrape the platform controllers themselves. These live here, applied after kube-prometheus-stack,
+# because the add-on charts install earlier (before the ServiceMonitor CRD exists). Prometheus
+# picks up ServiceMonitors from every namespace (serviceMonitorSelectorNilUsesHelmValues: false).
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: external-secrets
+  namespace: monitoring
+  labels:
+    app.kubernetes.io/part-of: platform
+spec:
+  namespaceSelector:
+    matchNames: [external-secrets]
+  selector:
+    # Matches only external-secrets-metrics; the webhook Service is named external-secrets-webhook.
+    matchLabels:
+      app.kubernetes.io/name: external-secrets
+      app.kubernetes.io/instance: external-secrets
+  endpoints:
+    - port: metrics
+      interval: 30s
+---
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: karpenter
+  namespace: monitoring
+  labels:
+    app.kubernetes.io/part-of: platform
+spec:
+  namespaceSelector:
+    matchNames: [kube-system]
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: karpenter
+      app.kubernetes.io/instance: karpenter
+  endpoints:
+    - port: http-metrics
+      interval: 30s

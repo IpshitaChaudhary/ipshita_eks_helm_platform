@@ -1,0 +1,25 @@
+# ServiceMonitors and alerts for the platform add-ons. Wave 0: after kube-prometheus-stack (-1)
+# has created the monitoring.coreos.com CRDs. Pruned automatically - removing an alert from Git
+# should remove it from the cluster.
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: platform-monitoring
+  namespace: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "0"
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: platform
+  source:
+    repoURL: https://github.com/IpshitaChaudhary/ipshita_eks_helm_platform.git
+    targetRevision: main
+    path: platform/kube-prometheus-stack/platform-monitoring
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: monitoring
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true

@@ -1,0 +1,76 @@
+# Alerts for the platform add-ons. Each one names what breaks for workloads, not only what is
+# red: a stuck ExternalSecret means stale credentials, a dead Karpenter means no scale-out and no
+# Spot interruption draining. Routed by severity like every other alert (critical pages).
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: platform-alerts
+  namespace: monitoring
+  labels:
+    app.kubernetes.io/part-of: platform
+spec:
+  groups:
+    - name: external-secrets
+      rules:
+        - alert: ExternalSecretNotReady
+          expr: |
+            max by (namespace, name) (
+              externalsecret_status_condition{condition="Ready", status="False"}
+            ) == 1
+          for: 15m
+          labels:
+            severity: warning
+          annotations:
+            summary: "ExternalSecret {{ $labels.namespace }}/{{ $labels.name }} has not synced for 15 minutes"
+            description: >-
+              The Secret keeps its last synced values, but rotated credentials are not picked up and
+              a Secret that was never created blocks new pods. Usually the IRSA role or a missing
+              key in Secrets Manager: kubectl -n {{ $labels.namespace }} describe externalsecret {{ $labels.name }}
+        - alert: ExternalSecretsControllerDown
+          expr: absent(up{job="external-secrets-metrics"} == 1)
+          for: 10m
+          labels:
+            severity: warning
+          annotations:
+            summary: "The External Secrets controller has not been scraped for 10 minutes"
+            description: >-
+              Existing Secrets stay as they are, but nothing is refreshed or created until the
+              controller in namespace external-secrets is back.
+
+    - name: karpenter
+      rules:
+        - alert: KarpenterControllerDown
+          expr: absent(up{job="karpenter"} == 1)
+          for: 10m
+          labels:
+            severity: critical
+          annotations:
+            summary: "Karpenter has not been scraped for 10 minutes"
+            description: >-
+              No new nodes are launched, so pending pods stay pending, and Spot interruption
+              notices are not acted on, so those nodes disappear without draining.
+        - alert: KarpenterCloudProviderErrors
+          expr: |
+            sum by (method, error) (rate(karpenter_cloudprovider_errors_total[10m])) > 0
+          for: 15m
+          labels:
+            severity: warning
+          annotations:
+            summary: "Karpenter EC2 calls failing: {{ $labels.method }} ({{ $labels.error }})"
+            description: >-
+              Often insufficient capacity for every allowed instance type, a service quota, or the
+              node role / EC2NodeClass discovery tags. Check the karpenter logs in kube-system.
+        - alert: KarpenterNodePoolNearLimit
+          expr: |
+            max by (nodepool, resource_type) (karpenter_nodepools_usage{resource_type="cpu"})
+              / max by (nodepool, resource_type) (karpenter_nodepools_limit{resource_type="cpu"})
+              > 0.9
+          for: 15m
+          labels:
+            severity: warning
+          annotations:
+            summary: "NodePool {{ $labels.nodepool }} is above 90% of its CPU limit"
+            description: >-
+              At the limit Karpenter stops launching nodes for this NodePool and new pods stay
+              Pending. Raise spec.limits.cpu in karpenter/manifests/nodepool.yaml if the growth is
+              expected.
