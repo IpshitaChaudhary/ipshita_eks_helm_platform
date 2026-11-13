@@ -48,6 +48,15 @@ apply_manifest() {
   fi
 }
 
+# apply_kustomization <dir>: the same build Argo CD makes from that directory.
+apply_kustomization() {
+  if $DRY_RUN; then
+    kubectl kustomize "$1"
+  else
+    kubectl apply -k "$1"
+  fi
+}
+
 helm repo add eks https://aws.github.io/eks-charts --force-update >/dev/null
 helm repo add metrics-server https://kubernetes-sigs.github.io/metrics-server --force-update >/dev/null
 helm repo add external-secrets https://charts.external-secrets.io --force-update >/dev/null
@@ -95,7 +104,6 @@ install karpenter kube-system oci://public.ecr.aws/karpenter/karpenter \
 apply_manifest karpenter/manifests/ec2nodeclass.yaml
 apply_manifest karpenter/manifests/nodepool.yaml
 
-# Scrape configs and alerts for the add-ons themselves. Last, because they need the
+# Scrape configs, alerts and dashboards for the add-ons themselves. Last, because they need the
 # ServiceMonitor/PrometheusRule CRDs from kube-prometheus-stack and target Karpenter's Service.
-apply_manifest kube-prometheus-stack/platform-monitoring/servicemonitors.yaml
-apply_manifest kube-prometheus-stack/platform-monitoring/platform-alerts.yaml
+apply_kustomization kube-prometheus-stack/platform-monitoring
