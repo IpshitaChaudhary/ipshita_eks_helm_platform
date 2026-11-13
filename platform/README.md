@@ -77,3 +77,12 @@ export KARPENTER_QUEUE=example-cluster-karpenter-interruptions
   | `KarpenterControllerDown` | critical | No scale-out; Spot interruptions are not drained |
   | `KarpenterCloudProviderErrors` | warning | EC2 calls failing (capacity, quotas, IAM, discovery tags) |
   | `KarpenterNodePoolNearLimit` | warning | Above 90% of the NodePool CPU limit; at 100% pods stay Pending |
+
+  Each alert has a matching panel in a Grafana dashboard, so the page links to its explanation:
+  **Platform / Karpenter** (pending pods, NodePool CPU against its limit, node churn, disruption
+  decisions, Spot interruptions, EC2 errors) and **Platform / External Secrets** (ready / not ready,
+  a table of what is failing right now, sync errors, Secrets Manager calls by status). The JSON lives
+  in `platform-monitoring/dashboards/`; the directory is a kustomization that turns each file into a
+  `grafana_dashboard` ConfigMap, built the same way by Argo CD and `install.sh`. To change a
+  dashboard, edit it in Grafana, export the JSON, set every panel's data source to `${datasource}` and
+  open a PR: UI edits are not saved, and CI rejects hardcoded data sources and duplicate uids.

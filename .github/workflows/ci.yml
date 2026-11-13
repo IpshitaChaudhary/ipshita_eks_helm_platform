@@ -59,15 +59,25 @@ jobs:
           done
 
       # Dashboards must parse, and take the data source from the $datasource variable so they work
-      # on any Grafana, not only the one they were exported from.
+      # on any Grafana, not only the one they were exported from. App and platform dashboards share
+      # one Grafana, so a uid may only be used once. A platform dashboard that is not listed in the
+      # kustomization would never reach Grafana.
       - name: Grafana dashboards
         run: |
           set -euo pipefail
-          for f in charts/*/dashboards/*.json; do
+          files=(charts/*/dashboards/*.json platform/kube-prometheus-stack/platform-monitoring/dashboards/*.json)
+          for f in "${files[@]}"; do
             jq -e '.uid and .title' "$f" >/dev/null || { echo "::error file=$f::missing uid or title"; exit 1; }
             bad=$(jq -r '[.panels[] | select(.datasource.uid != "${datasource}") | .title] | join(", ")' "$f")
             if [ -n "$bad" ]; then echo "::error file=$f::hardcoded data source in: $bad"; exit 1; fi
             echo "ok: $f"
+          done
+          dup=$(jq -r '.uid' "${files[@]}" | sort | uniq -d)
+          if [ -n "$dup" ]; then echo "::error::dashboard uid used more than once: $dup"; exit 1; fi
+          kdir=platform/kube-prometheus-stack/platform-monitoring
+          for f in "$kdir"/dashboards/*.json; do
+            grep -q "dashboards/$(basename "$f")" "$kdir/kustomization.yaml" \
+              || { echo "::error file=$f::not listed in $kdir/kustomization.yaml"; exit 1; }
           done
 
       # Guard rails must keep failing: these renders are expected to be rejected.
@@ -181,12 +191,16 @@ jobs:
           promtool check rules rules.yaml
           for t in "$work"/*-test.yaml; do promtool test rules "$(basename "$t")"; done
 
+      # platform-monitoring/ is a kustomization, so validate what kustomize builds from it (the same
+      # objects Argo CD and install.sh apply), not the files on their own.
       - name: Validate platform manifests (CRD schemas)
         run: |
+          set -euo pipefail
+          kubectl kustomize platform/kube-prometheus-stack/platform-monitoring > platform-monitoring.yaml
           kubeconform -strict -summary -kubernetes-version 1.31.0 \
             -schema-location default \
             -schema-location 'https://raw.githubusercontent.com/datreeio/CRDs-catalog/main/{{.Group}}/{{.ResourceKind}}_{{.ResourceAPIVersion}}.json' \
-            platform/*/manifests/ platform/kube-prometheus-stack/platform-monitoring/
+            platform/*/manifests/ platform-monitoring.yaml
 
   # GitOps: the Argo CD bootstrap, the Application/AppProject manifests, and a guard that the
   # Applications pin the same chart versions as install.sh (two install paths, one set of versions).

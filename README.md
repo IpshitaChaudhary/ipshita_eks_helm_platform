@@ -88,3 +88,5 @@ CI fails if an Application and `install.sh` pin different chart versions.
 | Availability SLO: SLI recording rules, multi-window burn-rate alerts | Done |
 | CI: `promtool check rules` + alert unit tests | Done |
 | Platform self-monitoring: External Secrets + Karpenter scraping and alerts, unit-tested | Done |
+| Platform dashboards as code (Karpenter, External Secrets), shipped with kustomize | Done |
+| First release (`v0.1.0`), see [CHANGELOG.md](CHANGELOG.md) | Next |

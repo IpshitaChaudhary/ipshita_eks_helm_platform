@@ -1,4 +1,5 @@
-# ServiceMonitors and alerts for the platform add-ons. Wave 0: after kube-prometheus-stack (-1)
+# ServiceMonitors, alerts and Grafana dashboards for the platform add-ons, built with kustomize
+# (the directory has a kustomization.yaml). Wave 0: after kube-prometheus-stack (-1)
 # has created the monitoring.coreos.com CRDs. Pruned automatically - removing an alert from Git
 # should remove it from the cluster.
 apiVersion: argoproj.io/v1alpha1

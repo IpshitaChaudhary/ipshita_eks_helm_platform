@@ -1,0 +1,28 @@
+# Everything that watches the platform add-ons. Argo CD (gitops/apps/platform-monitoring.yaml)
+# builds this directory with kustomize, and install.sh applies the same build, so the dashboard
+# JSON stays a plain file you can diff and import, not JSON escaped inside YAML.
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+namespace: monitoring
+
+resources:
+  - servicemonitors.yaml
+  - platform-alerts.yaml
+
+# One ConfigMap per dashboard, picked up by the Grafana sidecar (grafana_dashboard label, any
+# namespace). A stable name, no hash suffix: Grafana keys dashboards by uid, and a renamed
+# ConfigMap would only leave an orphan behind for Argo CD to prune.
+generatorOptions:
+  disableNameSuffixHash: true
+  labels:
+    grafana_dashboard: "1"
+    app.kubernetes.io/part-of: platform
+
+configMapGenerator:
+  - name: platform-dashboard-karpenter
+    files:
+      - dashboards/karpenter.json
+  - name: platform-dashboard-external-secrets
+    files:
+      - dashboards/external-secrets.json
