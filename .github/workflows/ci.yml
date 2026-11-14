@@ -216,7 +216,14 @@ jobs:
           curl -sSL "https://github.com/kyverno/kyverno/releases/download/${KYVERNO_VERSION}/kyverno-cli_${KYVERNO_VERSION}_linux_x86_64.tar.gz" \
             | tar -xz -C /usr/local/bin kyverno
           kyverno version
-          kyverno test platform/kyverno/tests
+          # kyverno test skips a policy that fails its schema without saying so; make sure every
+          # policy was loaded before trusting the results.
+          expected=$(grep -c '^kind: ClusterPolicy' kyverno-policies.yaml)
+          out=$(kyverno test platform/kyverno/tests 2>&1) && rc=0 || rc=$?
+          echo "$out"
+          grep -q "Applying ${expected} policies" <<<"$out" \
+            || { echo "::error::kyverno test did not load all ${expected} policies (schema error?)"; exit 1; }
+          [ "$rc" -eq 0 ]
           for scenario in default production; do
             helm template ci charts/inventory-api -f "charts/inventory-api/ci/${scenario}-values.yaml" > "chart-${scenario}.yaml"
             # Don't trust the exit code alone: require the summary line, so a crash also fails.

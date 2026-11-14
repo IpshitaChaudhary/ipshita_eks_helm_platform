@@ -10,8 +10,7 @@ metadata:
     policies.kyverno.io/category: Pod Security
     policies.kyverno.io/severity: high
     policies.kyverno.io/description: >-
-      Rejects pods that do not meet the restricted Pod Security Standard. Pinned to the
-      Kubernetes version the cluster runs, so an upgrade of Kyverno can't tighten it silently.
+      Rejects pods that do not meet the restricted Pod Security Standard.
 spec:
   background: true
   rules:
@@ -24,4 +23,7 @@ spec:
         failureAction: Enforce
         podSecurity:
           level: restricted
-          version: v1.31
+          # "latest" is the newest standard built into the Kyverno version we pin (chart 3.4.6),
+          # so it only changes when that pin does, in a PR. A concrete version would be better,
+          # but this CRD only accepts up to v1.29, and v1.31 is rejected at apply time.
+          version: latest
