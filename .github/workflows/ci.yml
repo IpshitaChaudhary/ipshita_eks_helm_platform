@@ -246,6 +246,7 @@ jobs:
           check "$(pinned ESO_CHART_VERSION platform/install.sh)" "$(app_rev external-secrets external-secrets.yaml)" external-secrets
           check "$(pinned KARPENTER_CHART_VERSION platform/install.sh)" "$(app_rev karpenter karpenter.yaml)" karpenter
           check "$(pinned KUBE_PROMETHEUS_STACK_CHART_VERSION platform/install.sh)" "$(app_rev kube-prometheus-stack kube-prometheus-stack.yaml)" kube-prometheus-stack
+          check "$(pinned KYVERNO_CHART_VERSION platform/install.sh)" "$(app_rev kyverno kyverno.yaml)" kyverno
           check "$(pinned ARGOCD_CHART_VERSION gitops/bootstrap.sh)" "$(app_rev argo-cd argo-cd.yaml)" argo-cd
           exit $fail
 

@@ -21,6 +21,7 @@ METRICS_SERVER_CHART_VERSION=3.12.1
 ESO_CHART_VERSION=0.10.7
 KARPENTER_CHART_VERSION=1.1.7
 KUBE_PROMETHEUS_STACK_CHART_VERSION=65.1.1
+KYVERNO_CHART_VERSION=3.4.6
 
 # install <release> <namespace> <chart> <version> <values-file> [extra helm args...]
 install() {
@@ -61,6 +62,7 @@ helm repo add eks https://aws.github.io/eks-charts --force-update >/dev/null
 helm repo add metrics-server https://kubernetes-sigs.github.io/metrics-server --force-update >/dev/null
 helm repo add external-secrets https://charts.external-secrets.io --force-update >/dev/null
 helm repo add prometheus-community https://prometheus-community.github.io/helm-charts --force-update >/dev/null
+helm repo add kyverno https://kyverno.github.io/kyverno --force-update >/dev/null
 helm repo update >/dev/null
 
 install metrics-server kube-system metrics-server/metrics-server \
@@ -103,6 +105,10 @@ install karpenter kube-system oci://public.ecr.aws/karpenter/karpenter \
 
 apply_manifest karpenter/manifests/ec2nodeclass.yaml
 apply_manifest karpenter/manifests/nodepool.yaml
+
+# Admission policies for app namespaces. Platform namespaces are excluded in kyverno/values.yaml,
+# so installing Kyverno can't block any of the add-ons above.
+install kyverno kyverno kyverno/kyverno "$KYVERNO_CHART_VERSION" kyverno/values.yaml
 
 # Scrape configs, alerts and dashboards for the add-ons themselves. Last, because they need the
 # ServiceMonitor/PrometheusRule CRDs from kube-prometheus-stack and target Karpenter's Service.
