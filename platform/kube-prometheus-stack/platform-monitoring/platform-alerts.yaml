@@ -74,3 +74,35 @@ spec:
               At the limit Karpenter stops launching nodes for this NodePool and new pods stay
               Pending. Raise spec.limits.cpu in karpenter/manifests/nodepool.yaml if the growth is
               expected.
+
+    - name: kyverno
+      rules:
+        # Kyverno's webhook fails closed for app namespaces: while no replica is up, the API server
+        # rejects every pod create/update there, including HPA scale-out and evicted pods' replacements.
+        - alert: KyvernoAdmissionControllerDown
+          expr: absent(up{job="kyverno-svc-metrics"} == 1)
+          for: 5m
+          labels:
+            severity: critical
+          annotations:
+            summary: "No Kyverno admission controller has been up for 5 minutes"
+            description: >-
+              App namespaces fail closed, so no pod can be created or changed there: deploys, HPA
+              scale-out and replacements for evicted pods are all rejected. Platform namespaces are
+              not affected. Check the pods in namespace kyverno.
+        # Audit-mode policies never block anything, so this alert is the only push signal that a
+        # workload breaks one. Counts both admission requests and the background scans, so it
+        # keeps firing until the workload is fixed.
+        - alert: KyvernoAuditViolations
+          expr: |
+            sum by (policy_name, resource_namespace) (
+              increase(kyverno_policy_results_total{rule_result="fail", policy_validation_mode="audit"}[1h])
+            ) > 0
+          for: 5m
+          labels:
+            severity: warning
+          annotations:
+            summary: "Kyverno policy {{ $labels.policy_name }} reports violations in {{ $labels.resource_namespace }}"
+            description: >-
+              Nothing is blocked yet (the policy is in Audit mode), but these workloads would be
+              rejected once it is enforced: kubectl -n {{ $labels.resource_namespace }} get policyreport

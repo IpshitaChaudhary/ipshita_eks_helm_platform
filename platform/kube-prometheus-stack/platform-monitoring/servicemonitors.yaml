@@ -37,3 +37,23 @@ spec:
   endpoints:
     - port: http-metrics
       interval: 30s
+---
+# Kyverno's admission, background and reports controllers. Only their *-metrics Services have the
+# metrics-port port, so the webhook Service (kyverno-svc) matches the selector but adds no target.
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: kyverno
+  namespace: monitoring
+  labels:
+    app.kubernetes.io/part-of: platform
+spec:
+  namespaceSelector:
+    matchNames: [kyverno]
+  selector:
+    matchLabels:
+      app.kubernetes.io/part-of: kyverno
+      app.kubernetes.io/instance: kyverno
+  endpoints:
+    - port: metrics-port
+      interval: 30s

@@ -113,5 +113,6 @@ install kyverno kyverno kyverno/kyverno "$KYVERNO_CHART_VERSION" kyverno/values.
 apply_kustomization kyverno/policies
 
 # Scrape configs, alerts and dashboards for the add-ons themselves. Last, because they need the
-# ServiceMonitor/PrometheusRule CRDs from kube-prometheus-stack and target Karpenter's Service.
+# ServiceMonitor/PrometheusRule CRDs from kube-prometheus-stack and target the Karpenter and
+# Kyverno Services.
 apply_kustomization kube-prometheus-stack/platform-monitoring

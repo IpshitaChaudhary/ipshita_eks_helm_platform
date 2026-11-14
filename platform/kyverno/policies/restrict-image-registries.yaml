@@ -1,6 +1,6 @@
 # Images should come from ECR, where they are scanned on push and the pull is authenticated by the
-# node role. Audit for now: violations show up in PolicyReports (and Grafana) without blocking a
-# deploy. Switch to Enforce once the reports are clean.
+# node role. Audit for now: violations show up in PolicyReports and raise the warning alert
+# KyvernoAuditViolations, without blocking a deploy. Switch to Enforce once nothing is reported.
 apiVersion: kyverno.io/v1
 kind: ClusterPolicy
 metadata:
