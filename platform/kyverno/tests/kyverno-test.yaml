@@ -1,0 +1,79 @@
+# Unit tests for platform/kyverno/policies, run in CI with `kyverno test platform/kyverno/tests`.
+# Each guardrail has a pass case and the case it exists to stop.
+apiVersion: cli.kyverno.io/v1alpha1
+kind: Test
+metadata:
+  name: workload-guardrails
+policies:
+  - ../policies/pod-security-restricted.yaml
+  - ../policies/disallow-latest-tag.yaml
+  - ../policies/require-requests-limits.yaml
+  - ../policies/require-readiness-probe.yaml
+  - ../policies/restrict-image-registries.yaml
+resources:
+  - resources.yaml
+results:
+  - policy: pod-security-restricted
+    rule: restricted
+    kind: Pod
+    resources: [good-pod]
+    result: pass
+  - policy: pod-security-restricted
+    rule: restricted
+    kind: Pod
+    resources: [root-pod]
+    result: fail
+
+  - policy: disallow-latest-tag
+    rule: require-image-tag
+    kind: Pod
+    resources: [good-pod, digest-pod, latest-pod]
+    result: pass
+  - policy: disallow-latest-tag
+    rule: require-image-tag
+    kind: Pod
+    resources: [untagged-pod]
+    result: fail
+  - policy: disallow-latest-tag
+    rule: disallow-latest
+    kind: Pod
+    resources: [good-pod, digest-pod]
+    result: pass
+  - policy: disallow-latest-tag
+    rule: disallow-latest
+    kind: Pod
+    resources: [latest-pod]
+    result: fail
+
+  - policy: require-requests-limits
+    rule: requests-and-memory-limit
+    kind: Pod
+    resources: [good-pod]
+    result: pass
+  - policy: require-requests-limits
+    rule: requests-and-memory-limit
+    kind: Pod
+    resources: [no-limit-pod]
+    result: fail
+
+  - policy: require-readiness-probe
+    rule: readiness-probe
+    kind: Deployment
+    resources: [good-deployment]
+    result: pass
+  - policy: require-readiness-probe
+    rule: readiness-probe
+    kind: Deployment
+    resources: [no-probe-deployment]
+    result: fail
+
+  - policy: restrict-image-registries
+    rule: ecr-only
+    kind: Pod
+    resources: [good-pod]
+    result: pass
+  - policy: restrict-image-registries
+    rule: ecr-only
+    kind: Pod
+    resources: [dockerhub-pod]
+    result: fail
