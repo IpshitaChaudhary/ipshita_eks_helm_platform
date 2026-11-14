@@ -1,0 +1,34 @@
+# Kyverno admission controller and its CRDs. The ClusterPolicies that use those CRDs are a separate
+# Application in a later wave (kyverno-policies.yaml), so they never sync before the CRDs exist.
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: kyverno
+  namespace: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "-3"
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: platform
+  sources:
+    - repoURL: https://kyverno.github.io/kyverno
+      chart: kyverno
+      targetRevision: 3.4.6
+      helm:
+        valueFiles:
+          - $values/platform/kyverno/values.yaml
+    - repoURL: https://github.com/IpshitaChaudhary/ipshita_eks_helm_platform.git
+      targetRevision: main
+      ref: values
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: kyverno
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
+      # The policy CRDs are larger than the 256 KB client-side apply annotation allows.
+      - ServerSideApply=true

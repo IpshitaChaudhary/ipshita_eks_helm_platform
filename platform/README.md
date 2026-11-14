@@ -11,6 +11,7 @@ chart versions, so a cluster can be rebuilt exactly.
 | External Secrets | Syncs AWS Secrets Manager into the Secrets apps read with `envFrom` | `external-secrets/external-secrets` | 0.10.7 |
 | Karpenter | Adds right-sized nodes when pods are pending, removes them when idle | `oci://public.ecr.aws/karpenter/karpenter` | 1.1.7 |
 | kube-prometheus-stack | Prometheus, Alertmanager and Grafana; scrapes the apps' ServiceMonitors | `prometheus-community/kube-prometheus-stack` | 65.1.1 |
+| Kyverno | Rejects app pods that break the workload guardrails (`kyverno/policies/`) | `kyverno/kyverno` | 3.4.6 |
 
 ## Prerequisites
 
@@ -77,6 +78,8 @@ export KARPENTER_QUEUE=example-cluster-karpenter-interruptions
   | `KarpenterControllerDown` | critical | No scale-out; Spot interruptions are not drained |
   | `KarpenterCloudProviderErrors` | warning | EC2 calls failing (capacity, quotas, IAM, discovery tags) |
   | `KarpenterNodePoolNearLimit` | warning | Above 90% of the NodePool CPU limit; at 100% pods stay Pending |
+  | `KyvernoAdmissionControllerDown` | critical | No pod can be created or changed in app namespaces |
+  | `KyvernoAuditViolations` | warning | A workload breaks an Audit-mode policy and would be rejected once it is enforced |
 
   Each alert has a matching panel in a Grafana dashboard, so the page links to its explanation:
   **Platform / Karpenter** (pending pods, NodePool CPU against its limit, node churn, disruption
@@ -86,3 +89,22 @@ export KARPENTER_QUEUE=example-cluster-karpenter-interruptions
   `grafana_dashboard` ConfigMap, built the same way by Argo CD and `install.sh`. To change a
   dashboard, edit it in Grafana, export the JSON, set every panel's data source to `${datasource}` and
   open a PR: UI edits are not saved, and CI rejects hardcoded data sources and duplicate uids.
+- **Guardrails for app namespaces (Kyverno).** `kyverno/policies/` holds the rules every app must
+  follow, applied by `install.sh` after the chart and by Argo CD in wave -2, before any app:
+
+  | Policy | Mode | Rejects |
+  |---|---|---|
+  | `pod-security-restricted` | Enforce | Pods below the restricted Pod Security Standard |
+  | `disallow-latest-tag` | Enforce | Images with no tag or `:latest` (a digest is fine) |
+  | `require-requests-limits` | Enforce | Containers without CPU/memory requests or a memory limit |
+  | `require-readiness-probe` | Enforce | Deployments and StatefulSets without a readiness probe |
+  | `restrict-image-registries` | Audit | Images not from ECR or ECR Public (reported, not blocked yet) |
+
+  Pod rules also apply to Deployments, Jobs and the other controllers (Kyverno autogen), so a bad
+  Deployment is rejected at `kubectl apply` / Argo CD sync, not stuck later with zero pods.
+  Platform namespaces (kube-system, argocd, external-secrets, monitoring, kyverno) are excluded in
+  `kyverno/values.yaml`, so Kyverno can never block the controllers that run the cluster. App
+  namespaces fail closed, which is why the admission controller runs 3 replicas with a PDB and
+  pages when it is down. To add a policy: a file in `kyverno/policies/`, listed in its
+  `kustomization.yaml`, with pass and fail cases in `kyverno/tests/` (CI runs `kyverno test`, and
+  checks that the `inventory-api` chart still passes every Enforce policy).

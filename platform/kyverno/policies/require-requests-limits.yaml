@@ -1,0 +1,33 @@
+# Requests let the scheduler and Karpenter size nodes correctly; a memory limit stops one leaking
+# pod from taking the node down with it. No CPU limit is required on purpose: it only causes CFS
+# throttling, and the request already reserves the capacity (same choice as the inventory-api chart).
+apiVersion: kyverno.io/v1
+kind: ClusterPolicy
+metadata:
+  name: require-requests-limits
+  annotations:
+    policies.kyverno.io/title: Require CPU/memory requests and a memory limit
+    policies.kyverno.io/category: Best Practices
+    policies.kyverno.io/severity: medium
+    policies.kyverno.io/description: >-
+      Rejects containers without CPU and memory requests or without a memory limit.
+spec:
+  background: true
+  rules:
+    - name: requests-and-memory-limit
+      match:
+        any:
+          - resources:
+              kinds: [Pod]
+      validate:
+        failureAction: Enforce
+        message: "Set resources.requests.cpu, resources.requests.memory and resources.limits.memory on every container."
+        pattern:
+          spec:
+            containers:
+              - resources:
+                  requests:
+                    cpu: "?*"
+                    memory: "?*"
+                  limits:
+                    memory: "?*"

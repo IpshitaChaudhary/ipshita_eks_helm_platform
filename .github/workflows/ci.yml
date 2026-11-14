@@ -191,16 +191,48 @@ jobs:
           promtool check rules rules.yaml
           for t in "$work"/*-test.yaml; do promtool test rules "$(basename "$t")"; done
 
-      # platform-monitoring/ is a kustomization, so validate what kustomize builds from it (the same
-      # objects Argo CD and install.sh apply), not the files on their own.
+      # platform-monitoring/ and kyverno/policies/ are kustomizations, so validate what kustomize
+      # builds from them (the same objects Argo CD and install.sh apply), not the files on their own.
       - name: Validate platform manifests (CRD schemas)
         run: |
           set -euo pipefail
           kubectl kustomize platform/kube-prometheus-stack/platform-monitoring > platform-monitoring.yaml
+          kubectl kustomize platform/kyverno/policies > kyverno-policies.yaml
           kubeconform -strict -summary -kubernetes-version 1.31.0 \
             -schema-location default \
             -schema-location 'https://raw.githubusercontent.com/datreeio/CRDs-catalog/main/{{.Group}}/{{.ResourceKind}}_{{.ResourceAPIVersion}}.json' \
-            platform/*/manifests/ platform-monitoring.yaml
+            platform/*/manifests/ platform-monitoring.yaml kyverno-policies.yaml
+
+      # Every guardrail has a pass case and the case it exists to stop (kyverno test). Then the
+      # inventory-api chart, rendered with its default and production values, must pass every
+      # Enforce policy: the chart is the example the guardrails are written from. Audit-only rules
+      # (image registries) only warn, since the default values use a placeholder image name.
+      - name: Kyverno policies (unit tests + inventory-api chart)
+        env:
+          # The Kyverno version chart 3.4.6 deploys.
+          KYVERNO_VERSION: v1.14.5
+        run: |
+          set -euo pipefail
+          curl -sSL "https://github.com/kyverno/kyverno/releases/download/${KYVERNO_VERSION}/kyverno-cli_${KYVERNO_VERSION}_linux_x86_64.tar.gz" \
+            | tar -xz -C /usr/local/bin kyverno
+          kyverno version
+          # kyverno test skips a policy that fails its schema without saying so; make sure every
+          # policy was loaded before trusting the results.
+          expected=$(grep -c '^kind: ClusterPolicy' kyverno-policies.yaml)
+          out=$(kyverno test platform/kyverno/tests 2>&1) && rc=0 || rc=$?
+          echo "$out"
+          grep -q "Applying ${expected} policies" <<<"$out" \
+            || { echo "::error::kyverno test did not load all ${expected} policies (schema error?)"; exit 1; }
+          [ "$rc" -eq 0 ]
+          for scenario in default production; do
+            helm template ci charts/inventory-api -f "charts/inventory-api/ci/${scenario}-values.yaml" > "chart-${scenario}.yaml"
+            # Don't trust the exit code alone: require the summary line, so a crash also fails.
+            out=$(kyverno apply kyverno-policies.yaml --resource "chart-${scenario}.yaml" --audit-warn 2>&1) || true
+            echo "$out"
+            if ! grep -q 'fail: 0,' <<<"$out" || ! grep -q 'error: 0,' <<<"$out"; then
+              echo "::error::inventory-api (${scenario} values) breaks an enforced Kyverno policy"; exit 1
+            fi
+          done
 
   # GitOps: the Argo CD bootstrap, the Application/AppProject manifests, and a guard that the
   # Applications pin the same chart versions as install.sh (two install paths, one set of versions).
@@ -246,6 +278,7 @@ jobs:
           check "$(pinned ESO_CHART_VERSION platform/install.sh)" "$(app_rev external-secrets external-secrets.yaml)" external-secrets
           check "$(pinned KARPENTER_CHART_VERSION platform/install.sh)" "$(app_rev karpenter karpenter.yaml)" karpenter
           check "$(pinned KUBE_PROMETHEUS_STACK_CHART_VERSION platform/install.sh)" "$(app_rev kube-prometheus-stack kube-prometheus-stack.yaml)" kube-prometheus-stack
+          check "$(pinned KYVERNO_CHART_VERSION platform/install.sh)" "$(app_rev kyverno kyverno.yaml)" kyverno
           check "$(pinned ARGOCD_CHART_VERSION gitops/bootstrap.sh)" "$(app_rev argo-cd argo-cd.yaml)" argo-cd
           exit $fail
 

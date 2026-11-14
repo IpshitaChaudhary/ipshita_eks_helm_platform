@@ -30,6 +30,10 @@ covers both the app and the platform.
   Manager. (#5)
 - Platform self-monitoring: ServiceMonitors and alerts for External Secrets and Karpenter. (#7)
 - Grafana dashboards for Karpenter and External Secrets, built with kustomize. (#8)
+- Kyverno with five ClusterPolicies for app namespaces: restricted Pod Security, no `latest`
+  tag, requests and a memory limit, readiness probes (Enforce), ECR-only images (Audit).
+  Platform namespaces excluded; 3 admission replicas; alerts for an outage and for audit
+  violations. (#9)
 
 ### GitOps (`gitops/`)
 
@@ -45,3 +49,5 @@ covers both the app and the platform.
 - Dashboard JSON checks, `amtool check-config` and route tests. (#5)
 - `promtool check rules` and alert unit tests for the app SLO and platform alerts. (#6, #7)
 - Validate the kustomize build of `platform-monitoring/`; one uid per dashboard. (#8)
+- `kyverno test` with pass and fail cases per policy, a guard that every policy loaded, and the
+  `inventory-api` chart checked against the Enforce policies. (#9)

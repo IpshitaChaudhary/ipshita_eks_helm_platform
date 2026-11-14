@@ -1,0 +1,31 @@
+# Without a readiness probe a rolling update sends traffic to pods that haven't started yet, and
+# maxUnavailable: 0 protects nothing. Checked on the long-running controllers only: a Job's pods
+# have no traffic to protect.
+apiVersion: kyverno.io/v1
+kind: ClusterPolicy
+metadata:
+  name: require-readiness-probe
+  annotations:
+    policies.kyverno.io/title: Require a readiness probe
+    policies.kyverno.io/category: Best Practices
+    policies.kyverno.io/severity: medium
+    policies.kyverno.io/description: >-
+      Rejects Deployments and StatefulSets whose containers have no readiness probe.
+spec:
+  background: true
+  rules:
+    - name: readiness-probe
+      match:
+        any:
+          - resources:
+              kinds: [Deployment, StatefulSet]
+      validate:
+        failureAction: Enforce
+        message: "Every container in a Deployment or StatefulSet needs a readinessProbe."
+        pattern:
+          spec:
+            template:
+              spec:
+                containers:
+                  - readinessProbe:
+                      periodSeconds: ">0"

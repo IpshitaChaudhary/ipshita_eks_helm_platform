@@ -1,0 +1,205 @@
+# Test workloads for kyverno-test.yaml: one compliant pod and Deployment, and one per guardrail
+# that breaks exactly that rule (everything else about it is compliant), so a failure points at
+# one policy only.
+apiVersion: v1
+kind: Pod
+metadata:
+  name: good-pod
+  namespace: inventory-api
+spec:
+  securityContext:
+    runAsNonRoot: true
+    seccompProfile:
+      type: RuntimeDefault
+  containers:
+    - name: app
+      image: 111122223333.dkr.ecr.us-east-1.amazonaws.com/inventory-api:3f9c2ab
+      securityContext:
+        allowPrivilegeEscalation: false
+        capabilities:
+          drop: ["ALL"]
+      resources:
+        requests:
+          cpu: 50m
+          memory: 64Mi
+        limits:
+          memory: 128Mi
+---
+# Runs as root and can escalate: fails the restricted Pod Security Standard.
+apiVersion: v1
+kind: Pod
+metadata:
+  name: root-pod
+  namespace: inventory-api
+spec:
+  containers:
+    - name: app
+      image: 111122223333.dkr.ecr.us-east-1.amazonaws.com/inventory-api:3f9c2ab
+      resources:
+        requests:
+          cpu: 50m
+          memory: 64Mi
+        limits:
+          memory: 128Mi
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  name: latest-pod
+  namespace: inventory-api
+spec:
+  securityContext:
+    runAsNonRoot: true
+    seccompProfile:
+      type: RuntimeDefault
+  containers:
+    - name: app
+      image: 111122223333.dkr.ecr.us-east-1.amazonaws.com/inventory-api:latest
+      securityContext:
+        allowPrivilegeEscalation: false
+        capabilities:
+          drop: ["ALL"]
+      resources:
+        requests:
+          cpu: 50m
+          memory: 64Mi
+        limits:
+          memory: 128Mi
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  name: untagged-pod
+  namespace: inventory-api
+spec:
+  securityContext:
+    runAsNonRoot: true
+    seccompProfile:
+      type: RuntimeDefault
+  containers:
+    - name: app
+      image: 111122223333.dkr.ecr.us-east-1.amazonaws.com/inventory-api
+      securityContext:
+        allowPrivilegeEscalation: false
+        capabilities:
+          drop: ["ALL"]
+      resources:
+        requests:
+          cpu: 50m
+          memory: 64Mi
+        limits:
+          memory: 128Mi
+---
+# Pinned by digest instead of a tag: allowed.
+apiVersion: v1
+kind: Pod
+metadata:
+  name: digest-pod
+  namespace: inventory-api
+spec:
+  securityContext:
+    runAsNonRoot: true
+    seccompProfile:
+      type: RuntimeDefault
+  containers:
+    - name: app
+      image: 111122223333.dkr.ecr.us-east-1.amazonaws.com/inventory-api@sha256:0000000000000000000000000000000000000000000000000000000000000000
+      securityContext:
+        allowPrivilegeEscalation: false
+        capabilities:
+          drop: ["ALL"]
+      resources:
+        requests:
+          cpu: 50m
+          memory: 64Mi
+        limits:
+          memory: 128Mi
+---
+# Requests but no memory limit.
+apiVersion: v1
+kind: Pod
+metadata:
+  name: no-limit-pod
+  namespace: inventory-api
+spec:
+  securityContext:
+    runAsNonRoot: true
+    seccompProfile:
+      type: RuntimeDefault
+  containers:
+    - name: app
+      image: 111122223333.dkr.ecr.us-east-1.amazonaws.com/inventory-api:3f9c2ab
+      securityContext:
+        allowPrivilegeEscalation: false
+        capabilities:
+          drop: ["ALL"]
+      resources:
+        requests:
+          cpu: 50m
+          memory: 64Mi
+---
+# From Docker Hub: reported by the (Audit) registry policy.
+apiVersion: v1
+kind: Pod
+metadata:
+  name: dockerhub-pod
+  namespace: inventory-api
+spec:
+  securityContext:
+    runAsNonRoot: true
+    seccompProfile:
+      type: RuntimeDefault
+  containers:
+    - name: app
+      image: docker.io/library/nginx:1.27
+      securityContext:
+        allowPrivilegeEscalation: false
+        capabilities:
+          drop: ["ALL"]
+      resources:
+        requests:
+          cpu: 50m
+          memory: 64Mi
+        limits:
+          memory: 128Mi
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: good-deployment
+  namespace: inventory-api
+spec:
+  selector:
+    matchLabels:
+      app: good
+  template:
+    metadata:
+      labels:
+        app: good
+    spec:
+      containers:
+        - name: app
+          image: 111122223333.dkr.ecr.us-east-1.amazonaws.com/inventory-api:3f9c2ab
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: 3000
+            periodSeconds: 5
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: no-probe-deployment
+  namespace: inventory-api
+spec:
+  selector:
+    matchLabels:
+      app: no-probe
+  template:
+    metadata:
+      labels:
+        app: no-probe
+    spec:
+      containers:
+        - name: app
+          image: 111122223333.dkr.ecr.us-east-1.amazonaws.com/inventory-api:3f9c2ab
