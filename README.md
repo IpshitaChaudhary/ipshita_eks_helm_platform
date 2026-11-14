@@ -94,4 +94,4 @@ CI fails if an Application and `install.sh` pin different chart versions.
 | Platform dashboards as code (Karpenter, External Secrets), shipped with kustomize | Done |
 | Policy guardrails: Kyverno + 5 ClusterPolicies for app namespaces, alerts | Done |
 | CI: `kyverno test` per policy, chart checked against the policies | Done |
-| First release (`v0.1.0`), see [CHANGELOG.md](CHANGELOG.md) | Next |
+| First release (`v0.1.0`), see [CHANGELOG.md](CHANGELOG.md) | Done |

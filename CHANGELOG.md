@@ -4,7 +4,9 @@ All notable changes to this repo. Versions follow [Semantic Versioning](https://
 while it is `0.x`, a minor release may change values keys or Application layout.
 The `inventory-api` chart has its own version in `charts/inventory-api/Chart.yaml`.
 
-## [Unreleased] - planned as v0.1.0
+## [Unreleased]
+
+## [0.1.0] - 2026-11-14
 
 The first complete platform: an application chart, the EKS add-ons, GitOps, and monitoring that
 covers both the app and the platform.
@@ -51,3 +53,6 @@ covers both the app and the platform.
 - Validate the kustomize build of `platform-monitoring/`; one uid per dashboard. (#8)
 - `kyverno test` with pass and fail cases per policy, a guard that every policy loaded, and the
   `inventory-api` chart checked against the Enforce policies. (#9)
+
+[Unreleased]: https://github.com/IpshitaChaudhary/ipshita_eks_helm_platform/compare/v0.1.0...HEAD
+[0.1.0]: https://github.com/IpshitaChaudhary/ipshita_eks_helm_platform/releases/tag/v0.1.0
