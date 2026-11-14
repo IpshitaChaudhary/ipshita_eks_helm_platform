@@ -46,8 +46,8 @@ Sync waves bring the cluster up in order, and Argo CD waits for each wave to be 
 | -10 | AppProjects `platform` and `apps`, Karpenter OCI repository |
 | -5 | Argo CD (manages its own upgrades) |
 | -4 | metrics-server, AWS Load Balancer Controller |
-| -3 | External Secrets, Karpenter (operators + CRDs) |
-| -2 | ClusterSecretStore, EC2NodeClass + NodePool, monitoring StorageClass + Grafana secret |
+| -3 | External Secrets, Karpenter, Kyverno (operators + CRDs) |
+| -2 | ClusterSecretStore, EC2NodeClass + NodePool, monitoring StorageClass + Grafana secret, Kyverno policies |
 | -1 | kube-prometheus-stack (its CRDs must exist before apps ship ServiceMonitors) |
 | 0 | inventory-api + its ExternalSecret |
 
@@ -67,6 +67,9 @@ CI fails if an Application and `install.sh` pin different chart versions.
   CI unit-tests the rules with `promtool` and proves where each severity lands before a change merges.
 - **Page on the error budget, not on thresholds.** Burn-rate alerts against an SLO page when users
   are really affected, and stay quiet for blips the budget can absorb.
+- **Guardrails are enforced, not suggested.** What the app chart does by default (restricted Pod
+  Security, pinned image tags, requests and a memory limit, readiness probes) is a Kyverno policy for
+  every app namespace, unit-tested in CI, and the chart is checked against it on every PR.
 - **No secrets in Git.** Charts reference existing Secrets (or External Secrets); values files never carry credentials.
 
 ## Roadmap
@@ -89,4 +92,6 @@ CI fails if an Application and `install.sh` pin different chart versions.
 | CI: `promtool check rules` + alert unit tests | Done |
 | Platform self-monitoring: External Secrets + Karpenter scraping and alerts, unit-tested | Done |
 | Platform dashboards as code (Karpenter, External Secrets), shipped with kustomize | Done |
+| Policy guardrails: Kyverno + 5 ClusterPolicies for app namespaces, alerts | Done |
+| CI: `kyverno test` per policy, chart checked against the policies | Done |
 | First release (`v0.1.0`), see [CHANGELOG.md](CHANGELOG.md) | Next |
