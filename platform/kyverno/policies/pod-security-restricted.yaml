@@ -1,0 +1,27 @@
+# The Kubernetes "restricted" Pod Security Standard: non-root, no privilege escalation, all
+# capabilities dropped, RuntimeDefault seccomp, no host namespaces/ports/paths. The inventory-api
+# chart meets it by default; this makes it the rule for every app, not only that one.
+apiVersion: kyverno.io/v1
+kind: ClusterPolicy
+metadata:
+  name: pod-security-restricted
+  annotations:
+    policies.kyverno.io/title: Pod Security Standards (restricted)
+    policies.kyverno.io/category: Pod Security
+    policies.kyverno.io/severity: high
+    policies.kyverno.io/description: >-
+      Rejects pods that do not meet the restricted Pod Security Standard. Pinned to the
+      Kubernetes version the cluster runs, so an upgrade of Kyverno can't tighten it silently.
+spec:
+  background: true
+  rules:
+    - name: restricted
+      match:
+        any:
+          - resources:
+              kinds: [Pod]
+      validate:
+        failureAction: Enforce
+        podSecurity:
+          level: restricted
+          version: v1.31

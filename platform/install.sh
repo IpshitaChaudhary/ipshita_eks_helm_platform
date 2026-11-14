@@ -109,6 +109,8 @@ apply_manifest karpenter/manifests/nodepool.yaml
 # Admission policies for app namespaces. Platform namespaces are excluded in kyverno/values.yaml,
 # so installing Kyverno can't block any of the add-ons above.
 install kyverno kyverno kyverno/kyverno "$KYVERNO_CHART_VERSION" kyverno/values.yaml
+# The policies need Kyverno's CRDs and a ready webhook; install() waits for both (--wait).
+apply_kustomization kyverno/policies
 
 # Scrape configs, alerts and dashboards for the add-ons themselves. Last, because they need the
 # ServiceMonitor/PrometheusRule CRDs from kube-prometheus-stack and target Karpenter's Service.

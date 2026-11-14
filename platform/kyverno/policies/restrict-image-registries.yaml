@@ -1,0 +1,30 @@
+# Images should come from ECR, where they are scanned on push and the pull is authenticated by the
+# node role. Audit for now: violations show up in PolicyReports (and Grafana) without blocking a
+# deploy. Switch to Enforce once the reports are clean.
+apiVersion: kyverno.io/v1
+kind: ClusterPolicy
+metadata:
+  name: restrict-image-registries
+  annotations:
+    policies.kyverno.io/title: Restrict image registries
+    policies.kyverno.io/category: Supply Chain
+    policies.kyverno.io/severity: medium
+    policies.kyverno.io/description: >-
+      Reports containers whose image is not from a private ECR registry or ECR Public.
+spec:
+  background: true
+  rules:
+    - name: ecr-only
+      match:
+        any:
+          - resources:
+              kinds: [Pod]
+      validate:
+        failureAction: Audit
+        message: "Images must come from ECR (<account>.dkr.ecr.<region>.amazonaws.com) or public.ecr.aws."
+        pattern:
+          spec:
+            containers:
+              - image: "*.dkr.ecr.*.amazonaws.com/* | public.ecr.aws/*"
+            =(initContainers):
+              - image: "*.dkr.ecr.*.amazonaws.com/* | public.ecr.aws/*"
