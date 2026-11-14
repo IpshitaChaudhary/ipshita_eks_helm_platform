@@ -11,6 +11,7 @@ chart versions, so a cluster can be rebuilt exactly.
 | External Secrets | Syncs AWS Secrets Manager into the Secrets apps read with `envFrom` | `external-secrets/external-secrets` | 0.10.7 |
 | Karpenter | Adds right-sized nodes when pods are pending, removes them when idle | `oci://public.ecr.aws/karpenter/karpenter` | 1.1.7 |
 | kube-prometheus-stack | Prometheus, Alertmanager and Grafana; scrapes the apps' ServiceMonitors | `prometheus-community/kube-prometheus-stack` | 65.1.1 |
+| Kyverno | Rejects app pods that break the workload guardrails (`kyverno/policies/`) | `kyverno/kyverno` | 3.4.6 |
 
 ## Prerequisites
 

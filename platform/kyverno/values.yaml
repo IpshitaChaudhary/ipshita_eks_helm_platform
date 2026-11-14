@@ -1,0 +1,77 @@
+# Values for kyverno/kyverno. Kyverno is the admission controller that enforces the workload
+# guardrails in kyverno/policies/: what the inventory-api chart does by default (non-root, no
+# "latest" tag, resource requests) becomes a rule for every app namespace, not a convention.
+#
+# Kyverno 1.14 supports Kubernetes 1.29-1.32, which covers the 1.30/1.31 this repo targets.
+
+crds:
+  install: true
+
+config:
+  # Platform namespaces are out of scope on purpose, in two places:
+  # - webhooks.namespaceSelector: the API server never calls Kyverno for them, so a Kyverno outage
+  #   can't block the controllers that run the cluster (and Kyverno itself).
+  # - resourceFiltersIncludeNamespaces: background scans and policy reports skip them too.
+  # The kyverno namespace is excluded by the chart itself (excludeKyvernoNamespace).
+  # Platform charts are pinned and reviewed in this repo; node-exporter, for example, needs
+  # hostNetwork and hostPath and could never pass the restricted Pod Security profile.
+  webhooks:
+    namespaceSelector:
+      matchExpressions:
+        - key: kubernetes.io/metadata.name
+          operator: NotIn
+          values:
+            - kube-system
+            - kube-public
+            - kube-node-lease
+            - argocd
+            - external-secrets
+            - monitoring
+  resourceFiltersIncludeNamespaces:
+    - argocd
+    - external-secrets
+    - monitoring
+
+  # Don't rewrite image references to add docker.io: an image must be written the way it is pulled.
+  enableDefaultRegistryMutation: false
+
+# Policies fail closed (failurePolicy: Fail) for app namespaces, so the admission controller must
+# not be a single point of failure: three replicas spread over nodes, and a PDB.
+admissionController:
+  replicas: 3
+  podDisruptionBudget:
+    enabled: true
+    minAvailable: 2
+  topologySpreadConstraints:
+    - maxSkew: 1
+      topologyKey: topology.kubernetes.io/zone
+      whenUnsatisfiable: ScheduleAnyway
+      labelSelector:
+        matchLabels:
+          app.kubernetes.io/component: admission-controller
+          app.kubernetes.io/instance: kyverno
+  container:
+    resources:
+      requests:
+        cpu: 100m
+        memory: 256Mi
+      limits:
+        memory: 512Mi
+
+# Background scans (existing resources) and PolicyReports. Not on the admission path, so two
+# replicas each are enough.
+backgroundController:
+  replicas: 2
+  podDisruptionBudget:
+    enabled: true
+    minAvailable: 1
+
+reportsController:
+  replicas: 2
+  podDisruptionBudget:
+    enabled: true
+    minAvailable: 1
+
+# Only needed for CleanupPolicies, which this repo doesn't use.
+cleanupController:
+  enabled: false

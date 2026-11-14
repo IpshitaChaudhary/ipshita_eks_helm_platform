@@ -1,0 +1,29 @@
+# The workload guardrails (ClusterPolicies), built with kustomize from platform/kyverno/policies.
+# Wave -2: after Kyverno (-3) has installed the CRDs and its webhook is Healthy, and before the apps
+# (0), so no app pod is ever admitted without the policies in place. Pruned: deleting a policy
+# file removes the policy from the cluster.
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: kyverno-policies
+  namespace: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "-2"
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: platform
+  source:
+    repoURL: https://github.com/IpshitaChaudhary/ipshita_eks_helm_platform.git
+    targetRevision: main
+    path: platform/kyverno/policies
+  destination:
+    server: https://kubernetes.default.svc
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      # Server-side apply: Argo CD compares only the fields Git sets, so the defaults the
+      # ClusterPolicy CRD fills in (admission, background, emitWarning...) are not drift.
+      - ServerSideApply=true

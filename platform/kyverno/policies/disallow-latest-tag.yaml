@@ -1,0 +1,44 @@
+# Every image must name an exact version. "latest" (or no tag at all) means two pods of the same
+# Deployment can run different code, and a rollback goes back to whatever "latest" is today.
+apiVersion: kyverno.io/v1
+kind: ClusterPolicy
+metadata:
+  name: disallow-latest-tag
+  annotations:
+    policies.kyverno.io/title: Disallow latest tag
+    policies.kyverno.io/category: Best Practices
+    policies.kyverno.io/severity: medium
+    policies.kyverno.io/description: >-
+      Rejects containers whose image has no tag or uses "latest". A digest (image@sha256:...) is
+      accepted.
+spec:
+  background: true
+  rules:
+    - name: require-image-tag
+      match:
+        any:
+          - resources:
+              kinds: [Pod]
+      validate:
+        failureAction: Enforce
+        message: "Every container image needs an explicit tag or digest, e.g. inventory-api:3f9c2ab."
+        pattern:
+          spec:
+            containers:
+              - image: "*:*"
+            =(initContainers):
+              - image: "*:*"
+    - name: disallow-latest
+      match:
+        any:
+          - resources:
+              kinds: [Pod]
+      validate:
+        failureAction: Enforce
+        message: "The 'latest' tag is not allowed. Pin the image to a version or commit SHA."
+        pattern:
+          spec:
+            containers:
+              - image: "!*:latest"
+            =(initContainers):
+              - image: "!*:latest"

@@ -1,0 +1,20 @@
+# Workload guardrails for app namespaces. Platform namespaces are excluded in kyverno/values.yaml,
+# not here, so a policy can't accidentally block an add-on. Applied by Argo CD
+# (gitops/apps/kyverno-policies.yaml) and install.sh from this same build.
+#
+# Policies on Pods also cover Deployments, StatefulSets, DaemonSets, Jobs and CronJobs: Kyverno
+# generates the matching rules for the pod templates, so a bad Deployment is rejected at apply
+# time instead of failing silently when its ReplicaSet tries to create pods.
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+labels:
+  - pairs:
+      app.kubernetes.io/part-of: platform
+
+resources:
+  - pod-security-restricted.yaml
+  - disallow-latest-tag.yaml
+  - require-requests-limits.yaml
+  - require-readiness-probe.yaml
+  - restrict-image-registries.yaml
