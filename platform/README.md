@@ -8,6 +8,7 @@ chart versions, so a cluster can be rebuilt exactly.
 |---|---|---|---|
 | metrics-server | Feeds CPU/memory to the HorizontalPodAutoscaler | `metrics-server/metrics-server` | 3.12.1 |
 | AWS Load Balancer Controller | Turns `Ingress` (class `alb`) into an ALB with target-type `ip` | `eks/aws-load-balancer-controller` | 1.8.1 |
+| ExternalDNS | Points each Ingress host at its ALB in Route53, removes the record with the Ingress | `external-dns/external-dns` | 1.20.0 |
 | External Secrets | Syncs AWS Secrets Manager into the Secrets apps read with `envFrom` | `external-secrets/external-secrets` | 0.10.7 |
 | Karpenter | Adds right-sized nodes when pods are pending, removes them when idle | `oci://public.ecr.aws/karpenter/karpenter` | 1.1.7 |
 | kube-prometheus-stack | Prometheus, Alertmanager and Grafana; scrapes the apps' ServiceMonitors | `prometheus-community/kube-prometheus-stack` | 65.1.1 |
@@ -30,6 +31,8 @@ export CLUSTER_NAME=example-cluster
 export AWS_REGION=us-east-1
 export VPC_ID=vpc-0123456789abcdef0
 export LBC_ROLE_ARN=arn:aws:iam::111122223333:role/example-cluster-aws-lbc
+export EXTERNAL_DNS_ROLE_ARN=arn:aws:iam::111122223333:role/example-cluster-external-dns
+export EXTERNAL_DNS_DOMAIN=example.com
 export ESO_ROLE_ARN=arn:aws:iam::111122223333:role/example-cluster-external-secrets
 export KARPENTER_ROLE_ARN=arn:aws:iam::111122223333:role/example-cluster-karpenter
 export KARPENTER_QUEUE=example-cluster-karpenter-interruptions
@@ -45,6 +48,15 @@ export KARPENTER_QUEUE=example-cluster-karpenter-interruptions
 - **The Service mutator webhook is off.** Otherwise the controller takes over every
   `type: LoadBalancer` Service in the cluster, including ones meant for the legacy cloud provider.
 - **Two replicas and a PDB** for every controller, so a node drain never removes the only copy.
+  ExternalDNS is the exception: it has no leader election, so it runs one replica. While it is
+  down only DNS *changes* wait; every existing record keeps resolving.
+- **ExternalDNS only touches what it created.** Policy `sync` removes a record when its Ingress
+  goes, so no record is left pointing at a deleted load balancer. It is safe because of the TXT
+  registry: each record gets an ownership TXT (`extdns-` prefix) with the cluster name, and
+  ExternalDNS never changes a record without one, so hand-made records and other clusters'
+  records in the same zone are left alone. It is limited to the public zone for
+  `EXTERNAL_DNS_DOMAIN`, and its IRSA role can change only that zone
+  (`external-dns/iam-policy.json`).
 - **Secrets never pass through Git or Helm values.** External Secrets reads them from Secrets
   Manager at runtime; the IAM role should allow `secretsmanager:GetSecretValue` only on `app/*` and `platform/*`.
   The synced Secret is kept (`deletionPolicy: Retain`) if the ExternalSecret is removed, so a bad
@@ -80,6 +92,8 @@ export KARPENTER_QUEUE=example-cluster-karpenter-interruptions
   | `KarpenterNodePoolNearLimit` | warning | Above 90% of the NodePool CPU limit; at 100% pods stay Pending |
   | `KyvernoAdmissionControllerDown` | critical | No pod can be created or changed in app namespaces |
   | `KyvernoAuditViolations` | warning | A workload breaks an Audit-mode policy and would be rejected once it is enforced |
+  | `ExternalDNSDown` | warning | New or changed Ingress hosts get no DNS record; existing ones keep resolving |
+  | `ExternalDNSSyncStale` | warning | Running, but nothing reached Route53 for 10 minutes (IAM, zone, throttling) |
 
   Each alert has a matching panel in a Grafana dashboard, so the page links to its explanation:
   **Platform / Karpenter** (pending pods, NodePool CPU against its limit, node churn, disruption

@@ -6,6 +6,17 @@ The `inventory-api` chart has its own version in `charts/inventory-api/Chart.yam
 
 ## [Unreleased]
 
+### Added
+
+- ExternalDNS (chart 1.20.0): Route53 alias records for every Ingress host, deleted with the
+  Ingress, but only records this cluster owns (TXT registry, owner ID = cluster name). Public
+  zone for `EXTERNAL_DNS_DOMAIN` only; example IAM policy scoped to that zone. Argo CD wave -4.
+- `ExternalDNSDown` and `ExternalDNSSyncStale` alerts with promtool tests.
+
+### Changed
+
+- `install.sh` now also requires `EXTERNAL_DNS_ROLE_ARN` and `EXTERNAL_DNS_DOMAIN`.
+
 ## [0.1.0] - 2026-11-14
 
 The first complete platform: an application chart, the EKS add-ons, GitOps, and monitoring that
