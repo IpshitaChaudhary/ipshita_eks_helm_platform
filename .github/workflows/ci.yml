@@ -146,6 +146,8 @@ jobs:
           AWS_REGION: us-east-1
           VPC_ID: vpc-0123456789abcdef0
           LBC_ROLE_ARN: arn:aws:iam::111122223333:role/ci-aws-lbc
+          EXTERNAL_DNS_ROLE_ARN: arn:aws:iam::111122223333:role/ci-external-dns
+          EXTERNAL_DNS_DOMAIN: example.com
           ESO_ROLE_ARN: arn:aws:iam::111122223333:role/ci-external-secrets
           KARPENTER_ROLE_ARN: arn:aws:iam::111122223333:role/ci-karpenter
           KARPENTER_QUEUE: ci-cluster-karpenter
@@ -275,6 +277,7 @@ jobs:
           }
           check "$(pinned METRICS_SERVER_CHART_VERSION platform/install.sh)" "$(app_rev metrics-server metrics-server.yaml)" metrics-server
           check "$(pinned LBC_CHART_VERSION platform/install.sh)" "$(app_rev aws-load-balancer-controller aws-load-balancer-controller.yaml)" aws-load-balancer-controller
+          check "$(pinned EXTERNAL_DNS_CHART_VERSION platform/install.sh)" "$(app_rev external-dns external-dns.yaml)" external-dns
           check "$(pinned ESO_CHART_VERSION platform/install.sh)" "$(app_rev external-secrets external-secrets.yaml)" external-secrets
           check "$(pinned KARPENTER_CHART_VERSION platform/install.sh)" "$(app_rev karpenter karpenter.yaml)" karpenter
           check "$(pinned KUBE_PROMETHEUS_STACK_CHART_VERSION platform/install.sh)" "$(app_rev kube-prometheus-stack kube-prometheus-stack.yaml)" kube-prometheus-stack

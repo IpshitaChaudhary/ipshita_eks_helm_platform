@@ -1,0 +1,38 @@
+# Same wave as the AWS Load Balancer Controller: ExternalDNS has no CRDs and nothing depends on it
+# at sync time; it only reads the hostnames the controller writes into Ingress status.
+# The domain, owner ID and IRSA role are the only lines to change per cluster.
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: external-dns
+  namespace: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "-4"
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: platform
+  sources:
+    - repoURL: https://kubernetes-sigs.github.io/external-dns/
+      chart: external-dns
+      targetRevision: 1.20.0
+      helm:
+        valueFiles:
+          - $values/platform/external-dns/values.yaml
+        valuesObject:
+          domainFilters:
+            - example.com
+          txtOwnerId: example-cluster
+          serviceAccount:
+            annotations:
+              eks.amazonaws.com/role-arn: arn:aws:iam::111122223333:role/example-cluster-external-dns
+    - repoURL: https://github.com/IpshitaChaudhary/ipshita_eks_helm_platform.git
+      targetRevision: main
+      ref: values
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: kube-system
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
