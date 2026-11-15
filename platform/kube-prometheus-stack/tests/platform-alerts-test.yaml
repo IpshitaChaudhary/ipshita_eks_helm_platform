@@ -193,3 +193,68 @@ tests:
             exp_annotations:
               summary: "Kyverno policy restrict-image-registries reports violations in inventory-api"
               description: "Nothing is blocked yet (the policy is in Audit mode), but these workloads would be rejected once it is enforced: kubectl -n inventory-api get policyreport"
+
+  # The ExternalDNS target goes down at 6m and warns after 10m, not before.
+  - name: external-dns down
+    interval: 1m
+    input_series:
+      - series: 'up{job="external-dns", namespace="kube-system", pod="external-dns-a"}'
+        values: '1x5 0x20'
+    alert_rule_test:
+      - eval_time: 14m
+        alertname: ExternalDNSDown
+        exp_alerts: []
+      - eval_time: 20m
+        alertname: ExternalDNSDown
+        exp_alerts:
+          - exp_labels:
+              severity: warning
+            exp_annotations:
+              summary: "ExternalDNS has not been scraped for 10 minutes"
+              description: "Existing records keep resolving, but a new or changed Ingress host gets no DNS record until ExternalDNS is back: kubectl -n kube-system get pods -l app.kubernetes.io/name=external-dns"
+
+  # last_sync holds the time of the last good sync (here: the series value is the sample time, in
+  # seconds). Syncs keep succeeding: quiet.
+  - name: external-dns syncing
+    interval: 1m
+    input_series:
+      - series: 'external_dns_controller_last_sync_timestamp_seconds{job="external-dns", pod="external-dns-a"}'
+        values: '0+60x30'
+    alert_rule_test:
+      - eval_time: 25m
+        alertname: ExternalDNSSyncStale
+        exp_alerts: []
+
+  # Syncs stop at 5m (e.g. AccessDenied after an IAM change) while the pod stays up: stale from
+  # 15m, warns 5 minutes later.
+  - name: external-dns sync stale
+    interval: 1m
+    input_series:
+      - series: 'external_dns_controller_last_sync_timestamp_seconds{job="external-dns", pod="external-dns-a"}'
+        values: '0+60x5 300x25'
+    alert_rule_test:
+      - eval_time: 18m
+        alertname: ExternalDNSSyncStale
+        exp_alerts: []
+      - eval_time: 25m
+        alertname: ExternalDNSSyncStale
+        exp_alerts:
+          - exp_labels:
+              severity: warning
+            exp_annotations:
+              summary: "ExternalDNS has not synced with Route53 for over 10 minutes"
+              description: "DNS records no longer follow Ingress changes. The reason is in the logs, usually AccessDenied (IRSA role, see platform/external-dns/iam-policy.json) or throttling: kubectl -n kube-system logs deploy/external-dns"
+
+  # A pod replaced at 6m (Recreate strategy): the old pod's series ends, the new one syncs. max()
+  # follows the newest sync, so the replacement never looks stale.
+  - name: external-dns pod replaced
+    interval: 1m
+    input_series:
+      - series: 'external_dns_controller_last_sync_timestamp_seconds{job="external-dns", pod="external-dns-a"}'
+        values: '0+60x5'
+      - series: 'external_dns_controller_last_sync_timestamp_seconds{job="external-dns", pod="external-dns-b"}'
+        values: '_x6 360+60x24'
+    alert_rule_test:
+      - eval_time: 25m
+        alertname: ExternalDNSSyncStale
+        exp_alerts: []
