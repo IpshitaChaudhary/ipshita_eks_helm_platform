@@ -106,3 +106,32 @@ spec:
             description: >-
               Nothing is blocked yet (the policy is in Audit mode), but these workloads would be
               rejected once it is enforced: kubectl -n {{ $labels.resource_namespace }} get policyreport
+
+    - name: external-dns
+      rules:
+        # Warning, not critical: records that exist keep resolving. What stops is DNS for new or
+        # changed Ingress hosts, and the cleanup of records for deleted ones.
+        - alert: ExternalDNSDown
+          expr: absent(up{job="external-dns"} == 1)
+          for: 10m
+          labels:
+            severity: warning
+          annotations:
+            summary: "ExternalDNS has not been scraped for 10 minutes"
+            description: >-
+              Existing records keep resolving, but a new or changed Ingress host gets no DNS record
+              until ExternalDNS is back: kubectl -n kube-system get pods -l app.kubernetes.io/name=external-dns
+        # Running but not syncing: last_sync only moves after a sync that reached Route53, so this
+        # catches what "up" can't (IRSA role or zone permissions wrong, Route53 throttling, a zone
+        # that does not match EXTERNAL_DNS_DOMAIN). With a 1m interval, 10 minutes is ~10 failures.
+        - alert: ExternalDNSSyncStale
+          expr: time() - max(external_dns_controller_last_sync_timestamp_seconds) > 600
+          for: 5m
+          labels:
+            severity: warning
+          annotations:
+            summary: "ExternalDNS has not synced with Route53 for over 10 minutes"
+            description: >-
+              DNS records no longer follow Ingress changes. The reason is in the logs, usually
+              AccessDenied (IRSA role, see platform/external-dns/iam-policy.json) or throttling:
+              kubectl -n kube-system logs deploy/external-dns

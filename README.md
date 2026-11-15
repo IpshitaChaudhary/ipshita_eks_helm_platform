@@ -45,7 +45,7 @@ Sync waves bring the cluster up in order, and Argo CD waits for each wave to be 
 |---|---|
 | -10 | AppProjects `platform` and `apps`, Karpenter OCI repository |
 | -5 | Argo CD (manages its own upgrades) |
-| -4 | metrics-server, AWS Load Balancer Controller |
+| -4 | metrics-server, AWS Load Balancer Controller, ExternalDNS |
 | -3 | External Secrets, Karpenter, Kyverno (operators + CRDs) |
 | -2 | ClusterSecretStore, EC2NodeClass + NodePool, monitoring StorageClass + Grafana secret, Kyverno policies |
 | -1 | kube-prometheus-stack (its CRDs must exist before apps ship ServiceMonitors) |
@@ -95,3 +95,4 @@ CI fails if an Application and `install.sh` pin different chart versions.
 | Policy guardrails: Kyverno + 5 ClusterPolicies for app namespaces, alerts | Done |
 | CI: `kyverno test` per policy, chart checked against the policies | Done |
 | First release (`v0.1.0`), see [CHANGELOG.md](CHANGELOG.md) | Done |
+| ExternalDNS: Route53 records for Ingress hosts, owned per cluster, alerts | Done |

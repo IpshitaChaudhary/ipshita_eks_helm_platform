@@ -57,3 +57,23 @@ spec:
   endpoints:
     - port: metrics-port
       interval: 30s
+---
+# ExternalDNS runs in kube-system next to other add-ons, so the selector needs both labels; its
+# only Service is the metrics one (port http, 7979).
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: external-dns
+  namespace: monitoring
+  labels:
+    app.kubernetes.io/part-of: platform
+spec:
+  namespaceSelector:
+    matchNames: [kube-system]
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: external-dns
+      app.kubernetes.io/instance: external-dns
+  endpoints:
+    - port: http
+      interval: 30s
