@@ -12,11 +12,14 @@ DRY_RUN=false
 : "${AWS_REGION:?set AWS_REGION}"
 : "${VPC_ID:?set VPC_ID}"
 : "${LBC_ROLE_ARN:?set LBC_ROLE_ARN (IRSA role for the load balancer controller)}"
+: "${EXTERNAL_DNS_ROLE_ARN:?set EXTERNAL_DNS_ROLE_ARN (IRSA role for external-dns, see external-dns/iam-policy.json)}"
+: "${EXTERNAL_DNS_DOMAIN:?set EXTERNAL_DNS_DOMAIN (the public Route53 zone ExternalDNS may change, e.g. example.com)}"
 : "${ESO_ROLE_ARN:?set ESO_ROLE_ARN (IRSA role for external-secrets)}"
 : "${KARPENTER_ROLE_ARN:?set KARPENTER_ROLE_ARN (IRSA role for the Karpenter controller)}"
 : "${KARPENTER_QUEUE:?set KARPENTER_QUEUE (SQS interruption queue name)}"
 
 LBC_CHART_VERSION=1.8.1
+EXTERNAL_DNS_CHART_VERSION=1.20.0
 METRICS_SERVER_CHART_VERSION=3.12.1
 ESO_CHART_VERSION=0.10.7
 KARPENTER_CHART_VERSION=1.1.7
@@ -60,6 +63,7 @@ apply_kustomization() {
 
 helm repo add eks https://aws.github.io/eks-charts --force-update >/dev/null
 helm repo add metrics-server https://kubernetes-sigs.github.io/metrics-server --force-update >/dev/null
+helm repo add external-dns https://kubernetes-sigs.github.io/external-dns/ --force-update >/dev/null
 helm repo add external-secrets https://charts.external-secrets.io --force-update >/dev/null
 helm repo add prometheus-community https://prometheus-community.github.io/helm-charts --force-update >/dev/null
 helm repo add kyverno https://kyverno.github.io/kyverno --force-update >/dev/null
@@ -74,6 +78,14 @@ install aws-load-balancer-controller kube-system eks/aws-load-balancer-controlle
   --set region="$AWS_REGION" \
   --set vpcId="$VPC_ID" \
   --set serviceAccount.annotations."eks\.amazonaws\.com/role-arn"="$LBC_ROLE_ARN"
+
+# Right after the load balancer controller: it writes the ALB hostname into each Ingress status,
+# and ExternalDNS points the Ingress host at that hostname. The cluster name is the TXT owner ID.
+install external-dns kube-system external-dns/external-dns \
+  "$EXTERNAL_DNS_CHART_VERSION" external-dns/values.yaml \
+  --set domainFilters[0]="$EXTERNAL_DNS_DOMAIN" \
+  --set txtOwnerId="$CLUSTER_NAME" \
+  --set serviceAccount.annotations."eks\.amazonaws\.com/role-arn"="$EXTERNAL_DNS_ROLE_ARN"
 
 install external-secrets external-secrets external-secrets/external-secrets \
   "$ESO_CHART_VERSION" external-secrets/values.yaml \

@@ -1,0 +1,51 @@
+# Values for external-dns/external-dns. ExternalDNS turns the host of every Ingress (and every
+# LoadBalancer Service with a hostname annotation) into a Route53 alias record pointing at the
+# load balancer the AWS Load Balancer Controller created, so a new app is reachable by name
+# without anyone editing DNS by hand.
+#
+# The domain, the owner ID and the IRSA role are passed by install.sh from the environment, so
+# this file holds no account-specific data.
+
+provider:
+  name: aws
+
+sources:
+  - ingress
+  - service
+
+# Only touch the zone(s) for this domain, and only public zones: a private zone with the same
+# name would otherwise get the same records.
+domainFilters: []
+#  - example.com: set by install.sh (EXTERNAL_DNS_DOMAIN)
+extraArgs:
+  - --aws-zone-type=public
+
+# sync also deletes the record when its Ingress is deleted. That is safe because of the TXT
+# registry below: ExternalDNS only changes or deletes records whose TXT ownership record carries
+# this cluster's owner ID, never records created by hand or by another cluster. upsert-only
+# would leave a record pointing at a deleted load balancer behind after every app removal.
+policy: sync
+registry: txt
+txtOwnerId: ""
+#  set by install.sh to the cluster name: two clusters sharing a zone never fight over a record.
+# The ownership records get a prefix, so they can't clash with a CNAME of the same name.
+txtPrefix: extdns-
+
+interval: 1m
+
+serviceAccount:
+  create: true
+  name: external-dns
+  annotations: {}
+  #  eks.amazonaws.com/role-arn: set by install.sh
+
+# ExternalDNS has no leader election, so it runs as a single replica (the chart default, with the
+# Recreate strategy). An outage only delays DNS changes; existing records keep resolving.
+resources:
+  requests:
+    cpu: 50m
+    memory: 64Mi
+  limits:
+    memory: 128Mi
+
+logFormat: json
