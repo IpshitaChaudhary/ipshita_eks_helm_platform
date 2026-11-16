@@ -6,20 +6,27 @@ The `inventory-api` chart has its own version in `charts/inventory-api/Chart.yam
 
 ## [Unreleased]
 
+## [0.2.0] - 2026-11-16
+
+DNS for every Ingress host, and Argo CD watched like every other add-on. The README now has an
+architecture and a sync-wave diagram.
+
 ### Added
 
 - ExternalDNS (chart 1.20.0): Route53 alias records for every Ingress host, deleted with the
   Ingress, but only records this cluster owns (TXT registry, owner ID = cluster name). Public
-  zone for `EXTERNAL_DNS_DOMAIN` only; example IAM policy scoped to that zone. Argo CD wave -4.
-- `ExternalDNSDown` and `ExternalDNSSyncStale` alerts with promtool tests.
+  zone for `EXTERNAL_DNS_DOMAIN` only; example IAM policy scoped to that zone. Argo CD wave -4. (#11)
+- `ExternalDNSDown` and `ExternalDNSSyncStale` alerts with promtool tests. (#11)
 - Argo CD metrics (application controller, server, repo-server, ApplicationSet controller),
-  scraped by a new `argo-cd` ServiceMonitor in `platform-monitoring/`.
+  scraped by a new `argo-cd` ServiceMonitor in `platform-monitoring/`. (#12)
 - `ArgoCDControllerDown`, `ArgoCDAppNotSynced` and `ArgoCDAppUnhealthy` alerts with promtool
-  tests, and a **Platform / Argo CD** Grafana dashboard.
+  tests, and a **Platform / Argo CD** Grafana dashboard. (#12)
+- README: architecture and sync-wave diagrams (Mermaid), CI and stack badges, an overview of
+  what the repo contains. (#13)
 
 ### Changed
 
-- `install.sh` now also requires `EXTERNAL_DNS_ROLE_ARN` and `EXTERNAL_DNS_DOMAIN`.
+- `install.sh` now also requires `EXTERNAL_DNS_ROLE_ARN` and `EXTERNAL_DNS_DOMAIN`. (#11)
 
 ## [0.1.0] - 2026-11-14
 
@@ -69,5 +76,6 @@ covers both the app and the platform.
 - `kyverno test` with pass and fail cases per policy, a guard that every policy loaded, and the
   `inventory-api` chart checked against the Enforce policies. (#9)
 
-[Unreleased]: https://github.com/IpshitaChaudhary/ipshita_eks_helm_platform/compare/v0.1.0...HEAD
+[Unreleased]: https://github.com/IpshitaChaudhary/ipshita_eks_helm_platform/compare/v0.2.0...HEAD
+[0.2.0]: https://github.com/IpshitaChaudhary/ipshita_eks_helm_platform/compare/v0.1.0...v0.2.0
 [0.1.0]: https://github.com/IpshitaChaudhary/ipshita_eks_helm_platform/releases/tag/v0.1.0
