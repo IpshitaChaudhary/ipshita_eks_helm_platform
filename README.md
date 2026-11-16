@@ -28,6 +28,56 @@ The EKS cluster itself is built with the `eks` module from
 [ipshita_terraform_infrastructure_module](https://github.com/IpshitaChaudhary/ipshita_terraform_infrastructure_module).
 This repo covers what runs **on** the cluster.
 
+## Architecture
+
+```mermaid
+flowchart LR
+  dev["Engineer"] -->|PR| gh["GitHub<br/>main (protected)"]
+  gh -->|"lint, render, kubeconform,<br/>promtool, kyverno test"| ci["CI: ci-passed"]
+  ci -->|merge| gh
+
+  subgraph aws["AWS account"]
+    r53["Route53<br/>public zone"]
+    alb["ALB"]
+    sm["Secrets Manager"]
+    ec2["EC2 / Spot"]
+
+    subgraph eks["EKS cluster"]
+      argo["Argo CD<br/>app-of-apps"]
+      subgraph addons["Platform add-ons"]
+        lbc["AWS Load Balancer<br/>Controller"]
+        edns["ExternalDNS"]
+        eso["External Secrets"]
+        karp["Karpenter"]
+        kyv["Kyverno"]
+        prom["Prometheus, Alertmanager,<br/>Grafana"]
+      end
+      app["inventory-api<br/>(Helm chart)"]
+    end
+  end
+
+  slack["Slack<br/>#alerts-critical / #alerts-warning"]
+  users["Users"]
+
+  gh -->|pull| argo
+  argo -->|sync waves| addons
+  argo --> app
+  lbc --> alb
+  edns --> r53
+  eso -->|IRSA| sm
+  karp -->|IRSA| ec2
+  kyv -.->|admission| app
+  prom -.->|scrape| app
+  prom -.->|scrape| addons
+  prom --> slack
+  users --> r53
+  users --> alb --> app
+```
+
+Argo CD pulls from `main`; nobody runs `kubectl apply` against the cluster. Every add-on reaches
+AWS through its own IRSA role, and Prometheus scrapes the add-ons as well as the app, so a broken
+controller pages like a broken service.
+
 ## Layout
 
 ```
