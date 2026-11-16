@@ -114,6 +114,21 @@ Two ways to install the platform, from the same pinned chart versions and values
 
 Sync waves bring the cluster up in order, and Argo CD waits for each wave to be Healthy:
 
+```mermaid
+flowchart TB
+  w10["-10 &nbsp; AppProjects, Karpenter OCI repo"] --> w5["-5 &nbsp; Argo CD (upgrades itself)"]
+  w5 --> w4["-4 &nbsp; metrics-server, Load Balancer Controller, ExternalDNS"]
+  w4 --> w3["-3 &nbsp; External Secrets, Karpenter, Kyverno<br/>operators + CRDs"]
+  w3 --> w2["-2 &nbsp; ClusterSecretStore, NodePool, StorageClass,<br/>Grafana secret, Kyverno policies"]
+  w2 --> w1["-1 &nbsp; kube-prometheus-stack<br/>ServiceMonitor / PrometheusRule CRDs"]
+  w1 --> w0["0 &nbsp; inventory-api, platform monitoring"]
+```
+
+Each arrow is a wait: a wave starts only when every Application in the one before is Healthy
+(the health check for Applications is restored in `platform/argo-cd/values.yaml`), so no
+resource is applied before the CRD, webhook or Secret it needs.
+
+
 | Wave | What |
 |---|---|
 | -10 | AppProjects `platform` and `apps`, Karpenter OCI repository |
