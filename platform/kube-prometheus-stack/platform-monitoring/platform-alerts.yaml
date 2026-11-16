@@ -135,3 +135,51 @@ spec:
               DNS records no longer follow Ingress changes. The reason is in the logs, usually
               AccessDenied (IRSA role, see platform/external-dns/iam-policy.json) or throttling:
               kubectl -n kube-system logs deploy/external-dns
+
+    - name: argo-cd
+      rules:
+        # Warning: running workloads are not affected. What stops is every deploy from Git and
+        # self-heal of manual changes, for the platform add-ons and the apps alike.
+        - alert: ArgoCDControllerDown
+          expr: absent(up{job="argocd-application-controller-metrics"} == 1)
+          for: 10m
+          labels:
+            severity: warning
+          annotations:
+            summary: "The Argo CD application controller has not been scraped for 10 minutes"
+            description: >-
+              Nothing is synced from Git until it is back: merged changes are not deployed and
+              manual changes are not reverted. kubectl -n argocd get pods -l app.kubernetes.io/name=argocd-application-controller
+        # Every Application here syncs automatically, so one that stays out of sync for 30 minutes
+        # is failing to sync (bad render, rejected by the API server or a Kyverno policy), not
+        # waiting. Unknown means the repo-server could not render it at all. argo-cd itself has no
+        # auto-prune, so a resource removed from its chart also shows up here until pruned by hand.
+        - alert: ArgoCDAppNotSynced
+          expr: |
+            max by (name, project, sync_status) (
+              argocd_app_info{sync_status!="Synced"}
+            ) == 1
+          for: 30m
+          labels:
+            severity: warning
+          annotations:
+            summary: "Argo CD Application {{ $labels.name }} ({{ $labels.project }}) has been {{ $labels.sync_status }} for 30 minutes"
+            description: >-
+              What is in Git is not what runs in the cluster. The sync error is in the Application
+              status: kubectl -n argocd get application {{ $labels.name }} -o jsonpath='{.status.operationState.message}'
+        # Degraded: a resource failed (e.g. a Deployment past its progress deadline). Missing: a
+        # resource Argo CD should have created does not exist. The app's own alerts say what users
+        # see; this one says which Application to look at.
+        - alert: ArgoCDAppUnhealthy
+          expr: |
+            max by (name, project, health_status) (
+              argocd_app_info{health_status=~"Degraded|Missing"}
+            ) == 1
+          for: 15m
+          labels:
+            severity: warning
+          annotations:
+            summary: "Argo CD Application {{ $labels.name }} ({{ $labels.project }}) is {{ $labels.health_status }}"
+            description: >-
+              The unhealthy resources are listed in the Application status:
+              kubectl -n argocd get application {{ $labels.name }} -o jsonpath='{.status.resources}'

@@ -77,3 +77,25 @@ spec:
   endpoints:
     - port: http
       interval: 30s
+---
+# Argo CD's four metrics Services (application controller, server, repo-server, ApplicationSet
+# controller). Their app.kubernetes.io/name labels differ, so select on part-of + instance; only
+# the -metrics Services have a port named http-metrics, so nothing else becomes a target. Each
+# target's job label is its Service name, e.g. argocd-application-controller-metrics.
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: argo-cd
+  namespace: monitoring
+  labels:
+    app.kubernetes.io/part-of: platform
+spec:
+  namespaceSelector:
+    matchNames: [argocd]
+  selector:
+    matchLabels:
+      app.kubernetes.io/part-of: argocd
+      app.kubernetes.io/instance: argocd
+  endpoints:
+    - port: http-metrics
+      interval: 30s

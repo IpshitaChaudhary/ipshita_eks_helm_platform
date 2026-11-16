@@ -32,6 +32,11 @@ configs:
 dex:
   enabled: false
 
+# Metrics: each component gets an <name>-metrics Service (port http-metrics). The chart's own
+# ServiceMonitors stay off: Argo CD is installed first (gitops/bootstrap.sh), before the
+# ServiceMonitor CRD exists. They are scraped by the argo-cd ServiceMonitor in
+# kube-prometheus-stack/platform-monitoring/ instead, like every other add-on.
+
 # Two replicas of everything stateless, so a node drain or a Spot interruption never takes Argo CD down.
 server:
   replicas: 2
@@ -47,15 +52,21 @@ server:
       alb.ingress.kubernetes.io/target-type: ip
       alb.ingress.kubernetes.io/listen-ports: '[{"HTTPS":443}]'
       alb.ingress.kubernetes.io/ssl-redirect: "443"
+  metrics:
+    enabled: true
 
 repoServer:
   replicas: 2
   pdb:
     enabled: true
     minAvailable: 1
+  metrics:
+    enabled: true
 
 applicationSet:
   replicas: 2
+  metrics:
+    enabled: true
 
 controller:
   resources:
@@ -64,6 +75,9 @@ controller:
       memory: 512Mi
     limits:
       memory: 1Gi
+  # argocd_app_info (sync and health of every Application) and argocd_app_sync_total come from here.
+  metrics:
+    enabled: true
 
 # A single Redis is fine for a cache Argo CD can rebuild; redis-ha needs at least 3 nodes.
 redis-ha:

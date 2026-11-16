@@ -12,6 +12,10 @@ The `inventory-api` chart has its own version in `charts/inventory-api/Chart.yam
   Ingress, but only records this cluster owns (TXT registry, owner ID = cluster name). Public
   zone for `EXTERNAL_DNS_DOMAIN` only; example IAM policy scoped to that zone. Argo CD wave -4.
 - `ExternalDNSDown` and `ExternalDNSSyncStale` alerts with promtool tests.
+- Argo CD metrics (application controller, server, repo-server, ApplicationSet controller),
+  scraped by a new `argo-cd` ServiceMonitor in `platform-monitoring/`.
+- `ArgoCDControllerDown`, `ArgoCDAppNotSynced` and `ArgoCDAppUnhealthy` alerts with promtool
+  tests, and a **Platform / Argo CD** Grafana dashboard.
 
 ### Changed
 

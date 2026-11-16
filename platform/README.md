@@ -78,9 +78,10 @@ export KARPENTER_QUEUE=example-cluster-karpenter-interruptions
   warning with the same name. The Slack webhook comes from Secrets Manager
   (`platform/alertmanager-slack`, key `webhook-url`) and is read from a mounted file.
 - **The platform watches itself.** `kube-prometheus-stack/platform-monitoring/` scrapes External
-  Secrets and Karpenter and alerts when they stop doing their job. It is applied after
-  kube-prometheus-stack (last in `install.sh`, wave 0 in Argo CD) because both add-ons install
-  before the ServiceMonitor CRD exists. Rules are unit-tested with `promtool`
+  Secrets, Karpenter, Kyverno, ExternalDNS and Argo CD and alerts when they stop doing their job.
+  It is applied after kube-prometheus-stack (last in `install.sh`, wave 0 in Argo CD) because
+  those add-ons install before the ServiceMonitor CRD exists (Argo CD's own chart ServiceMonitors
+  stay off for the same reason). Rules are unit-tested with `promtool`
   (`kube-prometheus-stack/tests/`).
 
   | Alert | Severity | What it means for workloads |
@@ -94,11 +95,16 @@ export KARPENTER_QUEUE=example-cluster-karpenter-interruptions
   | `KyvernoAuditViolations` | warning | A workload breaks an Audit-mode policy and would be rejected once it is enforced |
   | `ExternalDNSDown` | warning | New or changed Ingress hosts get no DNS record; existing ones keep resolving |
   | `ExternalDNSSyncStale` | warning | Running, but nothing reached Route53 for 10 minutes (IAM, zone, throttling) |
+  | `ArgoCDControllerDown` | warning | Nothing syncs from Git: merges are not deployed, manual changes not reverted |
+  | `ArgoCDAppNotSynced` | warning | An Application is OutOfSync or Unknown for 30 minutes despite automated sync |
+  | `ArgoCDAppUnhealthy` | warning | An Application is Degraded or Missing for 15 minutes |
 
   Each alert has a matching panel in a Grafana dashboard, so the page links to its explanation:
   **Platform / Karpenter** (pending pods, NodePool CPU against its limit, node churn, disruption
   decisions, Spot interruptions, EC2 errors) and **Platform / External Secrets** (ready / not ready,
-  a table of what is failing right now, sync errors, Secrets Manager calls by status). The JSON lives
+  a table of what is failing right now, sync errors, Secrets Manager calls by status) and
+  **Platform / Argo CD** (Applications not synced or not healthy with a table naming them, sync
+  results, reconcile time, repo-server Git latency, by project). The JSON lives
   in `platform-monitoring/dashboards/`; the directory is a kustomization that turns each file into a
   `grafana_dashboard` ConfigMap, built the same way by Argo CD and `install.sh`. To change a
   dashboard, edit it in Grafana, export the JSON, set every panel's data source to `${datasource}` and
