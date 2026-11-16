@@ -1,7 +1,28 @@
 # ipshita_eks_helm_platform
 
-Helm charts and platform add-ons for running workloads on **Amazon EKS** the way I run them in production:
-secure by default, observable, and safe to roll out and roll back.
+[![ci](https://github.com/IpshitaChaudhary/ipshita_eks_helm_platform/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/IpshitaChaudhary/ipshita_eks_helm_platform/actions/workflows/ci.yml)
+[![release](https://img.shields.io/github/v/release/IpshitaChaudhary/ipshita_eks_helm_platform?sort=semver)](https://github.com/IpshitaChaudhary/ipshita_eks_helm_platform/releases)
+![Amazon EKS](https://img.shields.io/badge/Amazon%20EKS-1.30%20%7C%201.31-FF9900?logo=amazoneks&logoColor=white)
+![Helm](https://img.shields.io/badge/Helm-3-0F1689?logo=helm&logoColor=white)
+![Argo CD](https://img.shields.io/badge/Argo%20CD-v3.5-EF7B4D?logo=argo&logoColor=white)
+![Prometheus](https://img.shields.io/badge/Prometheus-alerts%20unit--tested-E6522C?logo=prometheus&logoColor=white)
+![Kyverno](https://img.shields.io/badge/Kyverno-policies%20as%20code-1E5BB8)
+
+A complete platform for running workloads on **Amazon EKS** the way I run them in production:
+secure by default, observable, and safe to roll out and roll back. Everything is in Git and
+delivered by Argo CD, and every change is rendered, schema-validated and unit-tested in CI before
+it can merge.
+
+What is in it:
+
+- **An application chart** (`inventory-api`): hardened pods, IRSA, HPA, PDB, ALB Ingress,
+  default-deny NetworkPolicy, ServiceMonitor, SLO burn-rate alerts and a Grafana dashboard.
+- **The EKS add-ons**: AWS Load Balancer Controller, ExternalDNS, metrics-server, External Secrets,
+  Karpenter, kube-prometheus-stack and Kyverno, each with pinned versions and reviewed values.
+- **GitOps**: an Argo CD app-of-apps that brings the cluster up in order with sync waves and
+  manages its own upgrades.
+- **A platform that watches itself**: alerts and dashboards for every add-on, routed to Slack by
+  severity.
 
 The EKS cluster itself is built with the `eks` module from
 [ipshita_terraform_infrastructure_module](https://github.com/IpshitaChaudhary/ipshita_terraform_infrastructure_module).
@@ -13,8 +34,10 @@ This repo covers what runs **on** the cluster.
 charts/
   inventory-api/     # application chart (the Node.js API from jenkins-ci-cd-pipeline)
 platform/            # cluster add-ons: pinned values, manifests and an ordered install.sh
+  kube-prometheus-stack/platform-monitoring/   # ServiceMonitors, alerts, dashboards for the add-ons
+  kyverno/policies/  # ClusterPolicies for app namespaces (+ kyverno/tests/)
 gitops/              # Argo CD app-of-apps: bootstrap.sh, root app, projects, one Application per add-on/app
-.github/workflows/   # helm lint + render + kubeconform on every PR
+.github/workflows/   # CI: helm lint/render, kubeconform, promtool, amtool, kyverno test, drift checks
 ```
 
 ## Quick start
@@ -49,7 +72,7 @@ Sync waves bring the cluster up in order, and Argo CD waits for each wave to be 
 | -3 | External Secrets, Karpenter, Kyverno (operators + CRDs) |
 | -2 | ClusterSecretStore, EC2NodeClass + NodePool, monitoring StorageClass + Grafana secret, Kyverno policies |
 | -1 | kube-prometheus-stack (its CRDs must exist before apps ship ServiceMonitors) |
-| 0 | inventory-api + its ExternalSecret |
+| 0 | inventory-api + its ExternalSecret, platform monitoring (ServiceMonitors, alerts, dashboards) |
 
 Per cluster, only the values in `gitops/apps/*.yaml` change (cluster name, region, VPC, IRSA role ARNs);
 CI fails if an Application and `install.sh` pin different chart versions.
