@@ -96,3 +96,4 @@ CI fails if an Application and `install.sh` pin different chart versions.
 | CI: `kyverno test` per policy, chart checked against the policies | Done |
 | First release (`v0.1.0`), see [CHANGELOG.md](CHANGELOG.md) | Done |
 | ExternalDNS: Route53 records for Ingress hosts, owned per cluster, alerts | Done |
+| Argo CD self-monitoring: metrics, sync/health alerts (unit-tested), dashboard | Done |
