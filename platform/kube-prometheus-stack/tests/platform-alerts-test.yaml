@@ -258,3 +258,100 @@ tests:
       - eval_time: 25m
         alertname: ExternalDNSSyncStale
         exp_alerts: []
+
+  # The application controller goes down at 5m; the server's target staying up does not help,
+  # because only the controller syncs. Fires once it has been down for 10m.
+  - name: argo cd controller down
+    interval: 1m
+    input_series:
+      - series: 'up{job="argocd-application-controller-metrics", namespace="argocd", pod="argocd-application-controller-0"}'
+        values: '1x5 0x20'
+      - series: 'up{job="argocd-server-metrics", namespace="argocd", pod="argocd-server-a"}'
+        values: '1x25'
+    alert_rule_test:
+      - eval_time: 14m
+        alertname: ArgoCDControllerDown
+        exp_alerts: []
+      - eval_time: 20m
+        alertname: ArgoCDControllerDown
+        exp_alerts:
+          - exp_labels:
+              severity: warning
+            exp_annotations:
+              summary: "The Argo CD application controller has not been scraped for 10 minutes"
+              description: "Nothing is synced from Git until it is back: merged changes are not deployed and manual changes are not reverted. kubectl -n argocd get pods -l app.kubernetes.io/name=argocd-application-controller"
+
+  # inventory-api stays OutOfSync (its sync keeps failing) and warns after 30m. karpenter is
+  # OutOfSync for 10m while a sync runs, then Synced: its OutOfSync series goes stale, no alert.
+  - name: argo cd app not synced
+    interval: 1m
+    input_series:
+      - series: 'argocd_app_info{job="argocd-application-controller-metrics", namespace="argocd", name="inventory-api", project="apps", sync_status="OutOfSync", health_status="Healthy"}'
+        values: '1x40'
+      - series: 'argocd_app_info{job="argocd-application-controller-metrics", namespace="argocd", name="karpenter", project="platform", sync_status="OutOfSync", health_status="Healthy"}'
+        values: '1x10'
+      - series: 'argocd_app_info{job="argocd-application-controller-metrics", namespace="argocd", name="karpenter", project="platform", sync_status="Synced", health_status="Healthy"}'
+        values: '_x10 1x30'
+    alert_rule_test:
+      - eval_time: 20m
+        alertname: ArgoCDAppNotSynced
+        exp_alerts: []
+      - eval_time: 35m
+        alertname: ArgoCDAppNotSynced
+        exp_alerts:
+          - exp_labels:
+              severity: warning
+              name: inventory-api
+              project: apps
+              sync_status: OutOfSync
+            exp_annotations:
+              summary: "Argo CD Application inventory-api (apps) has been OutOfSync for 30 minutes"
+              description: "What is in Git is not what runs in the cluster. The sync error is in the Application status: kubectl -n argocd get application inventory-api -o jsonpath='{.status.operationState.message}'"
+
+  # Unknown (the repo-server could not render the app) counts as not synced too.
+  - name: argo cd app unknown
+    interval: 1m
+    input_series:
+      - series: 'argocd_app_info{job="argocd-application-controller-metrics", namespace="argocd", name="kyverno-policies", project="platform", sync_status="Unknown", health_status="Healthy"}'
+        values: '1x40'
+    alert_rule_test:
+      - eval_time: 35m
+        alertname: ArgoCDAppNotSynced
+        exp_alerts:
+          - exp_labels:
+              severity: warning
+              name: kyverno-policies
+              project: platform
+              sync_status: Unknown
+            exp_annotations:
+              summary: "Argo CD Application kyverno-policies (platform) has been Unknown for 30 minutes"
+              description: "What is in Git is not what runs in the cluster. The sync error is in the Application status: kubectl -n argocd get application kyverno-policies -o jsonpath='{.status.operationState.message}'"
+
+  # Degraded for 25m warns after 15m. Progressing (a rollout in flight) never does, and an app
+  # that was Degraded for 5m and recovered stays quiet.
+  - name: argo cd app unhealthy
+    interval: 1m
+    input_series:
+      - series: 'argocd_app_info{job="argocd-application-controller-metrics", namespace="argocd", name="inventory-api", project="apps", sync_status="Synced", health_status="Degraded"}'
+        values: '1x25'
+      - series: 'argocd_app_info{job="argocd-application-controller-metrics", namespace="argocd", name="kube-prometheus-stack", project="platform", sync_status="Synced", health_status="Progressing"}'
+        values: '1x25'
+      - series: 'argocd_app_info{job="argocd-application-controller-metrics", namespace="argocd", name="external-dns", project="platform", sync_status="Synced", health_status="Degraded"}'
+        values: '1x5'
+      - series: 'argocd_app_info{job="argocd-application-controller-metrics", namespace="argocd", name="external-dns", project="platform", sync_status="Synced", health_status="Healthy"}'
+        values: '_x5 1x20'
+    alert_rule_test:
+      - eval_time: 10m
+        alertname: ArgoCDAppUnhealthy
+        exp_alerts: []
+      - eval_time: 20m
+        alertname: ArgoCDAppUnhealthy
+        exp_alerts:
+          - exp_labels:
+              severity: warning
+              name: inventory-api
+              project: apps
+              health_status: Degraded
+            exp_annotations:
+              summary: "Argo CD Application inventory-api (apps) is Degraded"
+              description: "The unhealthy resources are listed in the Application status: kubectl -n argocd get application inventory-api -o jsonpath='{.status.resources}'"
