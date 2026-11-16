@@ -185,3 +185,7 @@ CI fails if an Application and `install.sh` pin different chart versions.
 | First release (`v0.1.0`), see [CHANGELOG.md](CHANGELOG.md) | Done |
 | ExternalDNS: Route53 records for Ingress hosts, owned per cluster, alerts | Done |
 | Argo CD self-monitoring: metrics, sync/health alerts (unit-tested), dashboard | Done |
+| Architecture and sync-wave diagrams, badges; release `v0.2.0` | Done |
+
+The platform is complete: everything on the roadmap is done and released. Changes from here are
+version bumps of the pinned charts, made the same way: PR, green CI, merge, Argo CD syncs.
