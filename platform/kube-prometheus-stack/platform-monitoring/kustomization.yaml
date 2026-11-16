@@ -26,3 +26,6 @@ configMapGenerator:
   - name: platform-dashboard-external-secrets
     files:
       - dashboards/external-secrets.json
+  - name: platform-dashboard-argo-cd
+    files:
+      - dashboards/argo-cd.json
